@@ -1,7 +1,5 @@
-# Readme
+#### Documents for your perusal
 
-This is the main entry point.
-
-[first-page](./first-page.md)
-
-[Chicken coop](./chicken-home/README.md)
+|                                          |              |
+| ---------------------------------------- | ------------ |
+| [Chicken coop](./chicken-home/README.md) | `2023-03-23` |
