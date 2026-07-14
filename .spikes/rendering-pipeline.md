@@ -6,4 +6,4 @@ I went for editor repo being separate from the blog repo. I think the next step 
 
 Another side idea is, I think of editing the blog from my phone, and committing and pushing the changes. How would I do that? Would I... use the GitHub app somehow linked to a local repo on my phone (I doubt this would work)? Or would I integrate with GitHub from the editor app to allow "Open from a Github Repo" type thing?
 
-First edit from a phone `2026-07-14 1607.`
+First edit from a phone `2026-07-14 1607.`I guess GitSync works.
