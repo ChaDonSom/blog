@@ -16,6 +16,21 @@
     <main class="post-shell">
       <article class="post-content">{{ content }}</article>
     </main>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        var links = document.querySelectorAll('a[href$=".md"], a[href*=".md#"], a[href*=".md?"]');
+
+        links.forEach(function (link) {
+          var href = link.getAttribute("href");
+
+          if (!href || href.startsWith("http://") || href.startsWith("https://") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+            return;
+          }
+
+          link.setAttribute("href", href.replace(/\.md(?=($|[?#]))/, ".html"));
+        });
+      });
+    </script>
     <script src="{{ '/assets/js/sticky-stack.js' | relative_url }}" defer></script>
   </body>
 </html>
