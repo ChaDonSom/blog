@@ -10,11 +10,6 @@
     return Number(m && m[1]) || 0
   }
 
-  function readTop(level) {
-    var value = root.style.getPropertyValue("--heading-sticky-top-" + level)
-    return Number.parseFloat(value) || 0
-  }
-
   function collect() {
     var arr = []
     root.querySelectorAll(selector).forEach(function (node, index) {
@@ -32,19 +27,18 @@
     return arr
   }
 
-  function updateOffsets() {
-    var maxH = [0, 0, 0, 0, 0, 0, 0]
-    root.querySelectorAll(selector).forEach(function (heading) {
-      var level = levelOf(heading)
-      if (!level) return
-      var h = Math.ceil(heading.getBoundingClientRect().height)
-      if (h > maxH[level]) maxH[level] = h
-    })
+  function stickyTopFromActive(activeByLevel, level) {
+    var top = 0
+    for (var l = 1; l < level; l += 1) {
+      var active = activeByLevel[l]
+      if (active) top += active.height
+    }
+    return top
+  }
 
-    var offset = 0
+  function applyStickyTops(activeByLevel) {
     for (var level = 1; level <= 6; level += 1) {
-      root.style.setProperty("--heading-sticky-top-" + level, offset + "px")
-      offset += maxH[level]
+      root.style.setProperty("--heading-sticky-top-" + level, stickyTopFromActive(activeByLevel, level) + "px")
     }
   }
 
@@ -75,11 +69,13 @@
 
     for (var i = 0; i < headings.length; i += 1) {
       var heading = headings[i]
-      var stickyTop = readTop(heading.level)
+      var stickyTop = stickyTopFromActive(activeByLevel, heading.level)
       if (heading.top > stickyTop + 0.5) break
       activeByLevel[heading.level] = heading
       for (var l = heading.level + 1; l <= 6; l += 1) activeByLevel[l] = null
     }
+
+    applyStickyTops(activeByLevel)
 
     var parentByLevel = [0, 0, 0, 0, 0, 0, 0]
     for (var level = 1; level <= 6; level += 1) {
@@ -102,7 +98,7 @@
       var current = activeByLevel[levelC]
       if (!current) continue
 
-      var currentStickyTop = readTop(levelC)
+      var currentStickyTop = stickyTopFromActive(activeByLevel, levelC)
       var stack = stackH[levelC] || current.height
       var end = nextBoundary(headings, current)
       var peer = nextPeer(headings, current, end)
@@ -132,7 +128,6 @@
     if (raf) return
     raf = requestAnimationFrame(function () {
       raf = 0
-      updateOffsets()
       updateActive()
     })
   }
