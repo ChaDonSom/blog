@@ -138,6 +138,8 @@ body {
 .post-content a {
   color: var(--accent);
   text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .post-content blockquote {
