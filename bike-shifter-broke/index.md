@@ -2,6 +2,10 @@
 
 Created: July 2, 2026 7:06 PM
 
+## Original research notes
+
+![image_81b926b0-eb1f-41c8-9364-868645277cd5](image_81b926b0-eb1f-41c8-9364-868645277cd5.png)
+
 You can use water instead of alcohol to get the grip off. I pushed a screwdriver into the grip first, although it did scratch the paint.
 
 After I got the grip off, I found the shifter has its own grip, with a key lobe to slot into the plastic part of the shifter.
@@ -18,7 +22,7 @@ Then, to get the shifter off the handlebar, I had to use the 2.5mm hex wrench. A
 
 But after I got it off, the hardest part was getting the shifter spin part and handlebar part to slide apart. It’s apparently clipped on by these 4 clips on the outside side.
 
-![image.png](image-4.png)  
+![image.png](image-4.png)
 
 In order to get that out, I fiddled for a bit with it, and ended up taking 4 mini screwdrivers and jamming all 4 in each tab at once. The first time I tried pulling, they all turned sideways. After resetting them and holding them upright while pulling on it, it came loose.
 
