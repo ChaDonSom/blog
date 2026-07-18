@@ -1,10 +1,3 @@
 ## Documents for your perusal
 
-|   
- |   
- |
-| --- | --- |
-| [Why MCP is bad yet still the way to go](./why-mcp-is-bad-yet-still-the-way-to-go.md) | 2025-09-22 |
-| [Vue component contexts](./vue-component-contexts.md)​ | 2025-06-20 |
-| [Christian Q-n-A](./christian-qna.md) | 2025-06-19 |
-| [Chicken coop](./chicken-home/)​ | 2023-03-23 |
+<table><thead></thead><tbody><tr><td><a href="./why-mcp-is-bad-yet-still-the-way-to-go.md" data-md-intent="[Why MCP is bad yet still the way to go](./why-mcp-is-bad-yet-still-the-way-to-go.md)">Why MCP is bad yet still the way to go</a></td><td><span style="white-space: normal;">2025-09-22</span></td></tr><tr><td><a href="./vue-component-contexts.md" data-md-intent="[Vue component contexts](./vue-component-contexts.md)">Vue component contexts</a>​</td><td>2025-06-20</td></tr><tr><td><a data-md-intent="[Christian Q-n-A](./christian-qna.md)" href="./christian-qna.md">Christian Q-n-A</a></td><td>2025-06-19</td></tr><tr><td><a href="./chicken-home/" data-md-intent="[Chicken coop](./chicken-home/)">Chicken coop</a>​</td><td>2023-03-23</td></tr></tbody></table>
