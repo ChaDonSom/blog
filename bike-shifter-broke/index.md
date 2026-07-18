@@ -6,6 +6,8 @@ Created: July 2, 2026 7:06 PM
 
 ![image_81b926b0-eb1f-41c8-9364-868645277cd5](image_81b926b0-eb1f-41c8-9364-868645277cd5.png)
 
+## Notes from trying it
+
 You can use water instead of alcohol to get the grip off. I pushed a screwdriver into the grip first, although it did scratch the paint.
 
 After I got the grip off, I found the shifter has its own grip, with a key lobe to slot into the plastic part of the shifter.
