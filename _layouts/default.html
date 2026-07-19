@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% if page.title %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="{{ '/assets/css/fieldnote.css' | relative_url }}" />
+  </head>
+  <body>
+    <main class="post-shell">
+      <article class="post-content">{{ content }}</article>
+    </main>
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        var links = document.querySelectorAll('a[href$=".md"], a[href*=".md#"], a[href*=".md?"]')
+
+        links.forEach(function (link) {
+          var href = link.getAttribute("href")
+
+          if (
+            !href ||
+            href.startsWith("http://") ||
+            href.startsWith("https://") ||
+            href.startsWith("mailto:") ||
+            href.startsWith("tel:")
+          ) {
+            return
+          }
+
+          link.setAttribute("href", href.replace(/\.md(?=($|[?#]))/, ".html"))
+        })
+      })
+    </script>
+    <!--
+      Sticky headings runtime is copied from npm into assets/js/vendor and committed.
+      This is intentional due to automatic GitHub Pages Jekyll deploy constraints.
+      See docs/sticky-headings-delivery.md.
+    -->
+    <script src="{{ '/assets/js/vendor/sticky-headings.js' | relative_url }}" defer></script>
+    <script src="{{ '/assets/js/sticky-stack.js' | relative_url }}" defer></script>
+  </body>
+</html>

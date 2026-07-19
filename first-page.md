@@ -1,3 +1,5 @@
-# First page
+---
+title: First page
+---
 
 Test page.

@@ -1,1 +1,9 @@
 title: Chase Somero's blog
+markdown: kramdown
+
+defaults:
+  - scope:
+      path: ""
+      type: "pages"
+    values:
+      layout: default

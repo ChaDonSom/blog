@@ -1,3 +1,7 @@
+---
+permalink: /chicken-home/
+---
+
 # Chicken home
 
 Created: March 28, 2023 5:38 PM
