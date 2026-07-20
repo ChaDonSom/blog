@@ -51,6 +51,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  touch-action: pan-y;
   background: var(--heading-sticky-bg);
   box-shadow: 0 1px 0 #e6dfd4;
   padding: 2px 0 3px;

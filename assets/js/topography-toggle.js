@@ -7,7 +7,7 @@
     var opts = options || {}
     var onProgress = typeof opts.onProgress === "function" ? opts.onProgress : function () {}
 
-    var mode = "open"
+    var committedMode = "open"
     var progress = 0
     var handles = []
     var segments = []
@@ -19,6 +19,7 @@
     var LOCK_DISTANCE_PX = 8
     var LOCK_RATIO = 1.2
     var DRAG_FULL_DISTANCE_PX = 220
+    var COMMIT_DISTANCE_PX = 42
     var SETTLE_DURATION_MS = 210
     var VELOCITY_COMMIT = 0.35
 
@@ -30,10 +31,6 @@
       return Math.min(max, Math.max(min, value))
     }
 
-    function updateModeFromProgress() {
-      mode = progress >= 0.5 ? "collapsed" : "open"
-    }
-
     function setProgress(nextProgress) {
       progress = clamp(nextProgress, 0, 1)
       root.style.setProperty("--topography-progress", String(progress))
@@ -42,7 +39,7 @@
     }
 
     function setButtonState() {
-      var collapsed = mode === "collapsed"
+      var collapsed = committedMode === "collapsed"
       handles.forEach(function (button) {
         button.setAttribute("aria-pressed", collapsed ? "true" : "false")
         button.setAttribute("aria-label", collapsed ? "Expand article body" : "Collapse article body")
@@ -66,17 +63,21 @@
       settleRafId = 0
     }
 
-    function animateTo(target, durationMs) {
+    function animateTo(target, durationMs, options) {
       cancelSettleAnimation()
+
+      var opts = options || {}
+      var shouldCommit = !!opts.commit
+      var shouldVibrate = !!opts.vibrate
 
       var from = progress
       var start = 0
       var delta = target - from
       if (Math.abs(delta) < 0.001) {
         setProgress(target)
-        mode = target >= 0.5 ? "collapsed" : "open"
+        if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
         setButtonState()
-        vibrateIfPossible()
+        if (shouldVibrate) vibrateIfPossible()
         return
       }
 
@@ -99,19 +100,22 @@
         }
 
         settleRafId = 0
-        mode = target >= 0.5 ? "collapsed" : "open"
+        if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
         setProgress(target)
         setButtonState()
         root.classList.remove("is-topography-settling")
-        vibrateIfPossible()
+        if (shouldVibrate) vibrateIfPossible()
       }
 
       settleRafId = window.requestAnimationFrame(tick)
     }
 
     function toggleMode() {
-      var target = mode === "collapsed" ? 0 : 1
-      animateTo(target, SETTLE_DURATION_MS)
+      var target = committedMode === "collapsed" ? 0 : 1
+      animateTo(target, SETTLE_DURATION_MS, {
+        commit: true,
+        vibrate: true,
+      })
     }
 
     function queueMeasure() {
@@ -228,10 +232,16 @@
         startX: event.clientX,
         startY: event.clientY,
         startProgress: progress,
+        startMode: committedMode,
         locked: false,
         lastX: event.clientX,
         lastT: event.timeStamp,
         velocityX: 0,
+        headingNode: event.target.closest("h1, h2, h3, h4, h5, h6"),
+      }
+
+      if (dragging.headingNode && dragging.headingNode.setPointerCapture) {
+        dragging.headingNode.setPointerCapture(event.pointerId)
       }
     }
 
@@ -262,7 +272,6 @@
       event.preventDefault()
       var next = dragging.startProgress + dx / DRAG_FULL_DISTANCE_PX
       setProgress(next)
-      updateModeFromProgress()
       setButtonState()
     }
 
@@ -271,31 +280,59 @@
 
       var wasLocked = dragging.locked
       var velocityX = dragging.velocityX
+      var totalDx = event.clientX - dragging.startX
+      var startMode = dragging.startMode
+      var headingNode = dragging.headingNode
       dragging = null
       root.classList.remove("is-topography-dragging")
+      if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
+        headingNode.releasePointerCapture(event.pointerId)
+      }
 
       if (!wasLocked) return
 
-      var target = 0
-      if (Math.abs(velocityX) > VELOCITY_COMMIT) target = velocityX > 0 ? 1 : 0
-      else target = progress >= 0.5 ? 1 : 0
+      var committedByDistance = Math.abs(totalDx) >= COMMIT_DISTANCE_PX
+      var committedByVelocity = Math.abs(velocityX) >= VELOCITY_COMMIT
+      if (committedByDistance || committedByVelocity) {
+        var commitTarget = totalDx > 0 || velocityX > 0 ? 1 : 0
+        animateTo(commitTarget, SETTLE_DURATION_MS, {
+          commit: true,
+          vibrate: true,
+        })
+        return
+      }
 
-      animateTo(target, SETTLE_DURATION_MS)
+      animateTo(startMode === "collapsed" ? 1 : 0, 150, {
+        commit: false,
+        vibrate: false,
+      })
     }
 
     function onPointerCancel(event) {
       if (!dragging || event.pointerId !== dragging.pointerId) return
+      var startMode = dragging.startMode
+      var headingNode = dragging.headingNode
       dragging = null
       root.classList.remove("is-topography-dragging")
-      animateTo(mode === "collapsed" ? 1 : 0, 150)
+      if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
+        headingNode.releasePointerCapture(event.pointerId)
+      }
+      animateTo(startMode === "collapsed" ? 1 : 0, 150, {
+        commit: false,
+        vibrate: false,
+      })
     }
 
     function onEscape(event) {
       if (event.key !== "Escape") return
       if (!dragging && !settleRafId) return
+      var resetTarget = dragging ? (dragging.startMode === "collapsed" ? 1 : 0) : committedMode === "collapsed" ? 1 : 0
       dragging = null
       root.classList.remove("is-topography-dragging")
-      animateTo(mode === "collapsed" ? 1 : 0, 140)
+      animateTo(resetTarget, 140, {
+        commit: false,
+        vibrate: false,
+      })
     }
 
     function setupObservers() {
