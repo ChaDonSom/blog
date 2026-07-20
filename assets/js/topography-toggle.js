@@ -7,21 +7,90 @@
     var opts = options || {}
     var onProgress = typeof opts.onProgress === "function" ? opts.onProgress : function () {}
 
-    var committedMode = "open"
-    var progress = 0
-    var handles = []
-    var segments = []
-    var rafId = 0
-    var settleRafId = 0
-    var dragging = null
-    var resizeObserver = null
+    var CONFIG = {
+      LOCK_DISTANCE_PX: 8,
+      LOCK_RATIO: 1.2,
+      DRAG_FULL_DISTANCE_PX: 220,
+      COMMIT_DISTANCE_PX: 42,
+      VELOCITY_COMMIT: 0.35,
+      SETTLE_DURATION_MS: 210,
+      CANCEL_DURATION_MS: 150,
+      ESCAPE_DURATION_MS: 140,
+    }
 
-    var LOCK_DISTANCE_PX = 8
-    var LOCK_RATIO = 1.2
-    var DRAG_FULL_DISTANCE_PX = 220
-    var COMMIT_DISTANCE_PX = 42
-    var SETTLE_DURATION_MS = 210
-    var VELOCITY_COMMIT = 0.35
+    var state = {
+      committedMode: "open",
+      progress: 0,
+      handles: [],
+      segments: [],
+      dragging: null,
+      rafMeasureId: 0,
+      rafSettleId: 0,
+      resizeObserver: null,
+    }
+
+    init()
+
+    return function destroy() {
+      unbindEvents()
+      teardownObservers()
+      cancelSettleAnimation()
+      if (state.rafMeasureId) {
+        window.cancelAnimationFrame(state.rafMeasureId)
+        state.rafMeasureId = 0
+      }
+    }
+
+    function init() {
+      wrapBodySegments()
+      buildHandles()
+      syncHandleState()
+      bindEvents()
+      setupObservers()
+      queueMeasure()
+    }
+
+    function bindEvents() {
+      root.addEventListener("pointerdown", onPointerDown)
+      root.addEventListener("pointermove", onPointerMove)
+      root.addEventListener("pointerup", onPointerUp)
+      root.addEventListener("pointercancel", onPointerCancel)
+      document.addEventListener("keydown", onEscape)
+      window.addEventListener("resize", queueMeasure)
+
+      if (document.fonts && document.fonts.addEventListener) {
+        document.fonts.addEventListener("loadingdone", queueMeasure)
+      }
+    }
+
+    function unbindEvents() {
+      root.removeEventListener("pointerdown", onPointerDown)
+      root.removeEventListener("pointermove", onPointerMove)
+      root.removeEventListener("pointerup", onPointerUp)
+      root.removeEventListener("pointercancel", onPointerCancel)
+      document.removeEventListener("keydown", onEscape)
+      window.removeEventListener("resize", queueMeasure)
+
+      if (document.fonts && document.fonts.removeEventListener) {
+        document.fonts.removeEventListener("loadingdone", queueMeasure)
+      }
+    }
+
+    function setupObservers() {
+      if (typeof ResizeObserver !== "function") return
+
+      state.resizeObserver = new ResizeObserver(function () {
+        queueMeasure()
+      })
+
+      state.resizeObserver.observe(root)
+    }
+
+    function teardownObservers() {
+      if (!state.resizeObserver) return
+      state.resizeObserver.disconnect()
+      state.resizeObserver = null
+    }
 
     function isHeading(node) {
       return !!node && node.nodeType === 1 && /^H[1-6]$/.test(node.tagName)
@@ -31,56 +100,23 @@
       return Math.min(max, Math.max(min, value))
     }
 
-    function buildAnchorState(headingNode) {
-      if (!headingNode || !headingNode.isConnected) return null
-      return {
-        node: headingNode,
-        lockY: headingNode.getBoundingClientRect().top,
-        forceTop: false,
-      }
-    }
-
-    function keepAnchorVerticalPosition(anchorState, isExpanding) {
-      if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
-
-      var desiredY = anchorState.forceTop ? 0 : anchorState.lockY
-      var currentY = anchorState.node.getBoundingClientRect().top
-      var scrollDelta = currentY - desiredY
-      if (Math.abs(scrollDelta) < 0.5) return
-
-      var before = window.scrollY
-      window.scrollBy(0, scrollDelta)
-      var after = window.scrollY
-      var applied = after - before
-      var residual = scrollDelta - applied
-
-      // On expand, if bounds block perfect anchoring, prefer pinning chosen heading near viewport top.
-      if (isExpanding && !anchorState.forceTop && Math.abs(residual) > 1.5) {
-        anchorState.forceTop = true
-        desiredY = 0
-        currentY = anchorState.node.getBoundingClientRect().top
-        scrollDelta = currentY - desiredY
-        if (Math.abs(scrollDelta) >= 0.5) window.scrollBy(0, scrollDelta)
-      }
-    }
-
-    function clearHeadingTransforms() {
-      var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
-      headings.forEach(function (heading) {
-        heading.style.transform = ""
-      })
-    }
-
     function setProgress(nextProgress) {
-      progress = clamp(nextProgress, 0, 1)
-      root.style.setProperty("--topography-progress", String(progress))
-      root.setAttribute("data-topography-mode", progress >= 1 ? "collapsed" : progress <= 0 ? "open" : "mixed")
-      onProgress(progress)
+      state.progress = clamp(nextProgress, 0, 1)
+      root.style.setProperty("--topography-progress", String(state.progress))
+      root.setAttribute(
+        "data-topography-mode",
+        state.progress >= 1 ? "collapsed" : state.progress <= 0 ? "open" : "mixed",
+      )
+      onProgress(state.progress)
     }
 
-    function setButtonState() {
-      var collapsed = committedMode === "collapsed"
-      handles.forEach(function (button) {
+    function setCommittedModeFromTarget(target) {
+      state.committedMode = target >= 0.5 ? "collapsed" : "open"
+    }
+
+    function syncHandleState() {
+      var collapsed = state.committedMode === "collapsed"
+      state.handles.forEach(function (button) {
         button.setAttribute("aria-pressed", collapsed ? "true" : "false")
         button.setAttribute("aria-label", collapsed ? "Expand article body" : "Collapse article body")
         button.setAttribute("title", collapsed ? "Expand article body" : "Collapse article body")
@@ -93,14 +129,43 @@
         typeof navigator.vibrate === "function" &&
         typeof window.matchMedia === "function" &&
         !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+
       if (!canVibrate) return
       navigator.vibrate(8)
     }
 
+    function clearHeadingTransforms() {
+      var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
+      headings.forEach(function (heading) {
+        heading.style.transform = ""
+      })
+    }
+
+    function createAnchorState(headingNode) {
+      if (!headingNode || !headingNode.isConnected) return null
+      return {
+        node: headingNode,
+        lockY: headingNode.getBoundingClientRect().top,
+      }
+    }
+
+    function keepAnchorLocked(anchorState) {
+      if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
+
+      var currentY = anchorState.node.getBoundingClientRect().top
+      var scrollDelta = currentY - anchorState.lockY
+      if (Math.abs(scrollDelta) < 0.5) return
+
+      window.scrollBy(0, scrollDelta)
+    }
+
     function cancelSettleAnimation() {
-      if (!settleRafId) return
-      window.cancelAnimationFrame(settleRafId)
-      settleRafId = 0
+      if (state.rafSettleId) {
+        window.cancelAnimationFrame(state.rafSettleId)
+        state.rafSettleId = 0
+      }
+
+      root.classList.remove("is-topography-settling")
     }
 
     function animateTo(target, durationMs, options) {
@@ -111,15 +176,15 @@
       var shouldVibrate = !!opts.vibrate
       var anchorState = opts.anchorState || null
 
-      var from = progress
-      var start = 0
+      var from = state.progress
       var delta = target - from
+      var start = 0
+
       if (Math.abs(delta) < 0.001) {
-        var prevAtStart = progress
         setProgress(target)
-        keepAnchorVerticalPosition(anchorState, target < prevAtStart)
-        if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
-        setButtonState()
+        keepAnchorLocked(anchorState)
+        if (shouldCommit) setCommittedModeFromTarget(target)
+        syncHandleState()
         if (shouldVibrate) vibrateIfPossible()
         return
       }
@@ -132,33 +197,37 @@
 
       function tick(ts) {
         if (!start) start = ts
+
         var elapsed = ts - start
         var t = clamp(elapsed / durationMs, 0, 1)
         var eased = easeOutCubic(t)
-        var prev = progress
+
         setProgress(from + delta * eased)
-        keepAnchorVerticalPosition(anchorState, progress < prev)
+        keepAnchorLocked(anchorState)
 
         if (t < 1) {
-          settleRafId = window.requestAnimationFrame(tick)
+          state.rafSettleId = window.requestAnimationFrame(tick)
           return
         }
 
-        settleRafId = 0
-        if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
+        state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
-        setButtonState()
+        keepAnchorLocked(anchorState)
+
+        if (shouldCommit) setCommittedModeFromTarget(target)
+        syncHandleState()
         if (shouldVibrate) vibrateIfPossible()
       }
 
-      settleRafId = window.requestAnimationFrame(tick)
+      state.rafSettleId = window.requestAnimationFrame(tick)
     }
 
-    function toggleMode(headingNode) {
-      var target = committedMode === "collapsed" ? 0 : 1
-      var anchorState = buildAnchorState(headingNode)
-      animateTo(target, SETTLE_DURATION_MS, {
+    function toggleModeFromHandle(headingNode) {
+      var target = state.committedMode === "collapsed" ? 0 : 1
+      var anchorState = createAnchorState(headingNode)
+
+      animateTo(target, CONFIG.SETTLE_DURATION_MS, {
         commit: true,
         vibrate: true,
         anchorState: anchorState,
@@ -166,24 +235,25 @@
     }
 
     function queueMeasure() {
-      if (rafId) return
-      rafId = window.requestAnimationFrame(function () {
-        rafId = 0
+      if (state.rafMeasureId) return
+
+      state.rafMeasureId = window.requestAnimationFrame(function () {
+        state.rafMeasureId = 0
         measureSegments()
       })
     }
 
     function measureSegments() {
-      segments.forEach(function (segment) {
+      state.segments.forEach(function (segment) {
         segment.style.removeProperty("--segment-height")
       })
 
-      segments.forEach(function (segment) {
+      state.segments.forEach(function (segment) {
         var height = Math.ceil(segment.scrollHeight)
         segment.style.setProperty("--segment-height", height + "px")
       })
 
-      setProgress(progress)
+      setProgress(state.progress)
     }
 
     function wrapBodySegments() {
@@ -226,16 +296,17 @@
       })
 
       flushPending(null)
-      segments = segmentRecords
+      state.segments = segmentRecords
     }
 
     function buildHandles() {
       var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
-      handles = []
+      state.handles = []
 
       headings.forEach(function (heading) {
-        if (heading.querySelector(".topography-handle")) {
-          handles.push(heading.querySelector(".topography-handle"))
+        var existing = heading.querySelector(".topography-handle")
+        if (existing) {
+          state.handles.push(existing)
           return
         }
 
@@ -248,17 +319,17 @@
 
         handle.addEventListener("click", function (event) {
           event.preventDefault()
-          toggleMode(heading)
+          toggleModeFromHandle(heading)
         })
 
         handle.addEventListener("keydown", function (event) {
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
-          toggleMode(heading)
+          toggleModeFromHandle(heading)
         })
 
         heading.appendChild(handle)
-        handles.push(handle)
+        state.handles.push(handle)
       })
     }
 
@@ -266,201 +337,158 @@
       if (pointerType === "mouse") return false
       if (!target) return false
       if (target.closest(".topography-handle")) return false
-      var heading = target.closest("h1, h2, h3, h4, h5, h6")
-      return !!heading
+      return !!target.closest("h1, h2, h3, h4, h5, h6")
+    }
+
+    function releasePointerCaptureSafe(dragState, pointerId) {
+      if (!dragState || !dragState.headingNode) return
+      var headingNode = dragState.headingNode
+
+      if (!headingNode.releasePointerCapture || !headingNode.hasPointerCapture) return
+      if (!headingNode.hasPointerCapture(pointerId)) return
+
+      headingNode.releasePointerCapture(pointerId)
+    }
+
+    function clearDragState(pointerId) {
+      var dragState = state.dragging
+      if (!dragState) return null
+
+      releasePointerCaptureSafe(dragState, pointerId)
+      state.dragging = null
+      root.classList.remove("is-topography-dragging")
+      clearHeadingTransforms()
+      return dragState
     }
 
     function onPointerDown(event) {
       if (!shouldTrackGesture(event.pointerType, event.target)) return
+
       cancelSettleAnimation()
       clearHeadingTransforms()
 
-      dragging = {
+      var headingNode = event.target.closest("h1, h2, h3, h4, h5, h6")
+
+      state.dragging = {
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
-        startProgress: progress,
-        startMode: committedMode,
-        locked: false,
         lastX: event.clientX,
         lastT: event.timeStamp,
         velocityX: 0,
-        headingNode: event.target.closest("h1, h2, h3, h4, h5, h6"),
-        anchorState: null,
+        startProgress: state.progress,
+        startMode: state.committedMode,
+        locked: false,
+        headingNode: headingNode,
+        anchorState: createAnchorState(headingNode),
       }
 
-      if (dragging.headingNode && dragging.headingNode.setPointerCapture) {
-        dragging.headingNode.setPointerCapture(event.pointerId)
+      if (headingNode && headingNode.setPointerCapture) {
+        headingNode.setPointerCapture(event.pointerId)
       }
-
-      dragging.anchorState = buildAnchorState(dragging.headingNode)
     }
 
     function onPointerMove(event) {
-      if (!dragging || event.pointerId !== dragging.pointerId) return
+      var dragState = state.dragging
+      if (!dragState || event.pointerId !== dragState.pointerId) return
 
-      var dx = event.clientX - dragging.startX
-      var dy = event.clientY - dragging.startY
+      var dx = event.clientX - dragState.startX
+      var dy = event.clientY - dragState.startY
 
-      var dt = event.timeStamp - dragging.lastT
+      var dt = event.timeStamp - dragState.lastT
       if (dt > 0) {
-        dragging.velocityX = (event.clientX - dragging.lastX) / dt
+        dragState.velocityX = (event.clientX - dragState.lastX) / dt
       }
-      dragging.lastX = event.clientX
-      dragging.lastT = event.timeStamp
+      dragState.lastX = event.clientX
+      dragState.lastT = event.timeStamp
 
-      if (!dragging.locked) {
-        if (Math.abs(dx) < LOCK_DISTANCE_PX) return
-        if (Math.abs(dx) <= Math.abs(dy) * LOCK_RATIO) {
-          if (
-            dragging.headingNode &&
-            dragging.headingNode.releasePointerCapture &&
-            dragging.headingNode.hasPointerCapture(event.pointerId)
-          ) {
-            dragging.headingNode.releasePointerCapture(event.pointerId)
-          }
-          dragging = null
+      if (!dragState.locked) {
+        if (Math.abs(dx) < CONFIG.LOCK_DISTANCE_PX) return
+
+        if (Math.abs(dx) <= Math.abs(dy) * CONFIG.LOCK_RATIO) {
+          clearDragState(event.pointerId)
           return
         }
 
-        dragging.locked = true
+        dragState.locked = true
         root.classList.add("is-topography-dragging")
         clearHeadingTransforms()
       }
 
       event.preventDefault()
-      var prev = progress
-      var next = dragging.startProgress + dx / DRAG_FULL_DISTANCE_PX
-      setProgress(next)
-      keepAnchorVerticalPosition(dragging.anchorState, progress < prev)
-      setButtonState()
+
+      var nextProgress = dragState.startProgress + dx / CONFIG.DRAG_FULL_DISTANCE_PX
+      setProgress(nextProgress)
+      keepAnchorLocked(dragState.anchorState)
+      syncHandleState()
     }
 
     function onPointerUp(event) {
-      if (!dragging || event.pointerId !== dragging.pointerId) return
+      var dragState = state.dragging
+      if (!dragState || event.pointerId !== dragState.pointerId) return
 
-      var wasLocked = dragging.locked
-      var velocityX = dragging.velocityX
-      var totalDx = event.clientX - dragging.startX
-      var startMode = dragging.startMode
-      var headingNode = dragging.headingNode
-      var anchorState = dragging.anchorState
-      dragging = null
-      root.classList.remove("is-topography-dragging")
-      clearHeadingTransforms()
-      if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
-        headingNode.releasePointerCapture(event.pointerId)
-      }
+      clearDragState(event.pointerId)
+      if (!dragState.locked) return
 
-      if (!wasLocked) return
+      var totalDx = event.clientX - dragState.startX
+      var absDx = Math.abs(totalDx)
+      var absVx = Math.abs(dragState.velocityX)
 
-      var committedByDistance = Math.abs(totalDx) >= COMMIT_DISTANCE_PX
-      var committedByVelocity = Math.abs(velocityX) >= VELOCITY_COMMIT
-      if (committedByDistance || committedByVelocity) {
-        var commitTarget = totalDx > 0 || velocityX > 0 ? 1 : 0
-        animateTo(commitTarget, SETTLE_DURATION_MS, {
+      var isCommitted = absDx >= CONFIG.COMMIT_DISTANCE_PX || absVx >= CONFIG.VELOCITY_COMMIT
+      if (isCommitted) {
+        var commitTarget = totalDx > 0 || dragState.velocityX > 0 ? 1 : 0
+        animateTo(commitTarget, CONFIG.SETTLE_DURATION_MS, {
           commit: true,
           vibrate: true,
-          anchorState: anchorState,
+          anchorState: dragState.anchorState,
         })
         return
       }
 
-      animateTo(startMode === "collapsed" ? 1 : 0, 150, {
+      var cancelTarget = dragState.startMode === "collapsed" ? 1 : 0
+      animateTo(cancelTarget, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
-        anchorState: anchorState,
+        anchorState: dragState.anchorState,
       })
     }
 
     function onPointerCancel(event) {
-      if (!dragging || event.pointerId !== dragging.pointerId) return
-      var startMode = dragging.startMode
-      var headingNode = dragging.headingNode
-      var anchorState = dragging.anchorState
-      dragging = null
-      root.classList.remove("is-topography-dragging")
-      clearHeadingTransforms()
-      if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
-        headingNode.releasePointerCapture(event.pointerId)
-      }
-      animateTo(startMode === "collapsed" ? 1 : 0, 150, {
+      var dragState = state.dragging
+      if (!dragState || event.pointerId !== dragState.pointerId) return
+
+      clearDragState(event.pointerId)
+
+      var cancelTarget = dragState.startMode === "collapsed" ? 1 : 0
+      animateTo(cancelTarget, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
-        anchorState: anchorState,
+        anchorState: dragState.anchorState,
       })
     }
 
     function onEscape(event) {
       if (event.key !== "Escape") return
-      if (!dragging && !settleRafId) return
-      var headingNode = dragging ? dragging.headingNode : null
-      var anchorState = dragging ? dragging.anchorState : null
-      var resetTarget = dragging ? (dragging.startMode === "collapsed" ? 1 : 0) : committedMode === "collapsed" ? 1 : 0
-      if (
-        dragging &&
-        headingNode &&
-        headingNode.releasePointerCapture &&
-        headingNode.hasPointerCapture(dragging.pointerId)
-      ) {
-        headingNode.releasePointerCapture(dragging.pointerId)
-      }
-      dragging = null
-      root.classList.remove("is-topography-dragging")
-      clearHeadingTransforms()
-      animateTo(resetTarget, 140, {
+      if (!state.dragging && !state.rafSettleId) return
+
+      var dragState = state.dragging
+      var anchorState = dragState ? dragState.anchorState : null
+      var resetTarget = dragState
+        ? dragState.startMode === "collapsed"
+          ? 1
+          : 0
+        : state.committedMode === "collapsed"
+          ? 1
+          : 0
+
+      if (dragState) clearDragState(dragState.pointerId)
+      else clearHeadingTransforms()
+
+      animateTo(resetTarget, CONFIG.ESCAPE_DURATION_MS, {
         commit: false,
         vibrate: false,
         anchorState: anchorState,
       })
-    }
-
-    function setupObservers() {
-      if (typeof ResizeObserver === "function") {
-        resizeObserver = new ResizeObserver(function () {
-          queueMeasure()
-        })
-        resizeObserver.observe(root)
-      }
-
-      window.addEventListener("resize", queueMeasure)
-      if (document.fonts && document.fonts.addEventListener) {
-        document.fonts.addEventListener("loadingdone", queueMeasure)
-      }
-    }
-
-    function setupEvents() {
-      root.addEventListener("pointerdown", onPointerDown)
-      root.addEventListener("pointermove", onPointerMove)
-      root.addEventListener("pointerup", onPointerUp)
-      root.addEventListener("pointercancel", onPointerCancel)
-      document.addEventListener("keydown", onEscape)
-    }
-
-    function teardownEvents() {
-      root.removeEventListener("pointerdown", onPointerDown)
-      root.removeEventListener("pointermove", onPointerMove)
-      root.removeEventListener("pointerup", onPointerUp)
-      root.removeEventListener("pointercancel", onPointerCancel)
-      document.removeEventListener("keydown", onEscape)
-      window.removeEventListener("resize", queueMeasure)
-      if (document.fonts && document.fonts.removeEventListener) {
-        document.fonts.removeEventListener("loadingdone", queueMeasure)
-      }
-    }
-
-    wrapBodySegments()
-    buildHandles()
-    setButtonState()
-    setupEvents()
-    setupObservers()
-    queueMeasure()
-
-    return function destroy() {
-      teardownEvents()
-      cancelSettleAnimation()
-      if (resizeObserver) resizeObserver.disconnect()
-      if (rafId) window.cancelAnimationFrame(rafId)
     }
   }
 
