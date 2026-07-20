@@ -19,7 +19,7 @@
     }
 
     var state = {
-      committedMode: "open",
+      committed: 0,
       progress: 0,
       handles: [],
       segments: [],
@@ -35,10 +35,13 @@
       unbindEvents()
       teardownObservers()
       cancelSettleAnimation()
+
       if (state.rafMeasureId) {
         window.cancelAnimationFrame(state.rafMeasureId)
         state.rafMeasureId = 0
       }
+
+      clearHeadingTransforms()
     }
 
     function init() {
@@ -92,16 +95,23 @@
       state.resizeObserver = null
     }
 
-    function isHeading(node) {
-      return !!node && node.nodeType === 1 && /^H[1-6]$/.test(node.tagName)
-    }
-
     function clamp(value, min, max) {
       return Math.min(max, Math.max(min, value))
     }
 
-    function setProgress(nextProgress) {
-      state.progress = clamp(nextProgress, 0, 1)
+    function isHeading(node) {
+      return !!node && node.nodeType === 1 && /^H[1-6]$/.test(node.tagName)
+    }
+
+    function clearHeadingTransforms() {
+      var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
+      headings.forEach(function (heading) {
+        heading.style.transform = ""
+      })
+    }
+
+    function setProgress(next) {
+      state.progress = clamp(next, 0, 1)
       root.style.setProperty("--topography-progress", String(state.progress))
       root.setAttribute(
         "data-topography-mode",
@@ -110,12 +120,12 @@
       onProgress(state.progress)
     }
 
-    function setCommittedModeFromTarget(target) {
-      state.committedMode = target >= 0.5 ? "collapsed" : "open"
+    function setCommitted(target) {
+      state.committed = target >= 0.5 ? 1 : 0
     }
 
     function syncHandleState() {
-      var collapsed = state.committedMode === "collapsed"
+      var collapsed = state.committed === 1
       state.handles.forEach(function (button) {
         button.setAttribute("aria-pressed", collapsed ? "true" : "false")
         button.setAttribute("aria-label", collapsed ? "Expand article body" : "Collapse article body")
@@ -134,38 +144,6 @@
       navigator.vibrate(8)
     }
 
-    function clearHeadingTransforms() {
-      var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
-      headings.forEach(function (heading) {
-        heading.style.transform = ""
-      })
-    }
-
-    function createAnchorState(headingNode) {
-      if (!headingNode || !headingNode.isConnected) return null
-      return {
-        node: headingNode,
-        lockY: headingNode.getBoundingClientRect().top,
-      }
-    }
-
-    function applyAnchorCompensation(anchorState) {
-      if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
-
-      var node = anchorState.node
-      // Measure natural heading Y without prior compensation to avoid feedback oscillation.
-      node.style.transform = ""
-      var naturalY = node.getBoundingClientRect().top
-      var translateY = anchorState.lockY - naturalY
-
-      if (Math.abs(translateY) < 0.5) {
-        node.style.transform = ""
-        return
-      }
-
-      node.style.transform = "translateY(" + translateY + "px)"
-    }
-
     function cancelSettleAnimation() {
       if (state.rafSettleId) {
         window.cancelAnimationFrame(state.rafSettleId)
@@ -181,16 +159,13 @@
       var opts = options || {}
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
-      var anchorState = opts.anchorState || null
-
       var from = state.progress
       var delta = target - from
-      var start = 0
+      var startedAt = 0
 
       if (Math.abs(delta) < 0.001) {
         setProgress(target)
-        applyAnchorCompensation(anchorState)
-        if (shouldCommit) setCommittedModeFromTarget(target)
+        if (shouldCommit) setCommitted(target)
         syncHandleState()
         if (shouldVibrate) vibrateIfPossible()
         return
@@ -203,14 +178,13 @@
       }
 
       function tick(ts) {
-        if (!start) start = ts
+        if (!startedAt) startedAt = ts
 
-        var elapsed = ts - start
+        var elapsed = ts - startedAt
         var t = clamp(elapsed / durationMs, 0, 1)
         var eased = easeOutCubic(t)
 
         setProgress(from + delta * eased)
-        applyAnchorCompensation(anchorState)
 
         if (t < 1) {
           state.rafSettleId = window.requestAnimationFrame(tick)
@@ -220,9 +194,8 @@
         state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
-        applyAnchorCompensation(anchorState)
 
-        if (shouldCommit) setCommittedModeFromTarget(target)
+        if (shouldCommit) setCommitted(target)
         syncHandleState()
         if (shouldVibrate) vibrateIfPossible()
       }
@@ -230,14 +203,11 @@
       state.rafSettleId = window.requestAnimationFrame(tick)
     }
 
-    function toggleModeFromHandle(headingNode) {
-      var target = state.committedMode === "collapsed" ? 0 : 1
-      var anchorState = createAnchorState(headingNode)
-
+    function toggleFromHandle() {
+      var target = state.committed === 1 ? 0 : 1
       animateTo(target, CONFIG.SETTLE_DURATION_MS, {
         commit: true,
         vibrate: true,
-        anchorState: anchorState,
       })
     }
 
@@ -266,9 +236,9 @@
     function wrapBodySegments() {
       var childNodes = Array.prototype.slice.call(root.childNodes)
       var pending = []
-      var segmentRecords = []
+      var collected = []
 
-      function flushPending(beforeNode) {
+      function flush(beforeNode) {
         if (!pending.length) return
 
         var segment = document.createElement("div")
@@ -284,13 +254,13 @@
         })
 
         root.insertBefore(segment, beforeNode || null)
-        segmentRecords.push(segment)
+        collected.push(segment)
         pending = []
       }
 
       childNodes.forEach(function (node) {
         if (isHeading(node)) {
-          flushPending(node)
+          flush(node)
           return
         }
 
@@ -302,8 +272,8 @@
         pending.push(node)
       })
 
-      flushPending(null)
-      state.segments = segmentRecords
+      flush(null)
+      state.segments = collected
     }
 
     function buildHandles() {
@@ -326,13 +296,13 @@
 
         handle.addEventListener("click", function (event) {
           event.preventDefault()
-          toggleModeFromHandle(heading)
+          toggleFromHandle()
         })
 
         handle.addEventListener("keydown", function (event) {
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
-          toggleModeFromHandle(heading)
+          toggleFromHandle()
         })
 
         heading.appendChild(handle)
@@ -364,7 +334,6 @@
       releasePointerCaptureSafe(dragState, pointerId)
       state.dragging = null
       root.classList.remove("is-topography-dragging")
-      clearHeadingTransforms()
       return dragState
     }
 
@@ -380,14 +349,13 @@
         pointerId: event.pointerId,
         startX: event.clientX,
         startY: event.clientY,
+        startProgress: state.progress,
+        startCommitted: state.committed,
         lastX: event.clientX,
         lastT: event.timeStamp,
         velocityX: 0,
-        startProgress: state.progress,
-        startMode: state.committedMode,
         locked: false,
         headingNode: headingNode,
-        anchorState: createAnchorState(headingNode),
       }
 
       if (headingNode && headingNode.setPointerCapture) {
@@ -419,14 +387,12 @@
 
         dragState.locked = true
         root.classList.add("is-topography-dragging")
-        clearHeadingTransforms()
       }
 
       event.preventDefault()
 
-      var nextProgress = dragState.startProgress + dx / CONFIG.DRAG_FULL_DISTANCE_PX
-      setProgress(nextProgress)
-      applyAnchorCompensation(dragState.anchorState)
+      var next = dragState.startProgress + dx / CONFIG.DRAG_FULL_DISTANCE_PX
+      setProgress(next)
       syncHandleState()
     }
 
@@ -440,23 +406,20 @@
       var totalDx = event.clientX - dragState.startX
       var absDx = Math.abs(totalDx)
       var absVx = Math.abs(dragState.velocityX)
+      var committed = absDx >= CONFIG.COMMIT_DISTANCE_PX || absVx >= CONFIG.VELOCITY_COMMIT
 
-      var isCommitted = absDx >= CONFIG.COMMIT_DISTANCE_PX || absVx >= CONFIG.VELOCITY_COMMIT
-      if (isCommitted) {
-        var commitTarget = totalDx > 0 || dragState.velocityX > 0 ? 1 : 0
-        animateTo(commitTarget, CONFIG.SETTLE_DURATION_MS, {
+      if (committed) {
+        var target = totalDx > 0 || dragState.velocityX > 0 ? 1 : 0
+        animateTo(target, CONFIG.SETTLE_DURATION_MS, {
           commit: true,
           vibrate: true,
-          anchorState: dragState.anchorState,
         })
         return
       }
 
-      var cancelTarget = dragState.startMode === "collapsed" ? 1 : 0
-      animateTo(cancelTarget, CONFIG.CANCEL_DURATION_MS, {
+      animateTo(dragState.startCommitted, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
-        anchorState: dragState.anchorState,
       })
     }
 
@@ -466,11 +429,9 @@
 
       clearDragState(event.pointerId)
 
-      var cancelTarget = dragState.startMode === "collapsed" ? 1 : 0
-      animateTo(cancelTarget, CONFIG.CANCEL_DURATION_MS, {
+      animateTo(dragState.startCommitted, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
-        anchorState: dragState.anchorState,
       })
     }
 
@@ -478,23 +439,11 @@
       if (event.key !== "Escape") return
       if (!state.dragging && !state.rafSettleId) return
 
-      var dragState = state.dragging
-      var anchorState = dragState ? dragState.anchorState : null
-      var resetTarget = dragState
-        ? dragState.startMode === "collapsed"
-          ? 1
-          : 0
-        : state.committedMode === "collapsed"
-          ? 1
-          : 0
+      if (state.dragging) clearDragState(state.dragging.pointerId)
 
-      if (dragState) clearDragState(dragState.pointerId)
-      else clearHeadingTransforms()
-
-      animateTo(resetTarget, CONFIG.ESCAPE_DURATION_MS, {
+      animateTo(state.committed, CONFIG.ESCAPE_DURATION_MS, {
         commit: false,
         vibrate: false,
-        anchorState: anchorState,
       })
     }
   }
