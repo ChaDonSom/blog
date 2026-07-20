@@ -181,6 +181,22 @@ body {
   position: sticky;
 }
 
+.post-content.is-topography-dragging h1[data-sticky-active="true"],
+.post-content.is-topography-dragging h2[data-sticky-active="true"],
+.post-content.is-topography-dragging h3[data-sticky-active="true"],
+.post-content.is-topography-dragging h4[data-sticky-active="true"],
+.post-content.is-topography-dragging h5[data-sticky-active="true"],
+.post-content.is-topography-dragging h6[data-sticky-active="true"],
+.post-content.is-topography-settling h1[data-sticky-active="true"],
+.post-content.is-topography-settling h2[data-sticky-active="true"],
+.post-content.is-topography-settling h3[data-sticky-active="true"],
+.post-content.is-topography-settling h4[data-sticky-active="true"],
+.post-content.is-topography-settling h5[data-sticky-active="true"],
+.post-content.is-topography-settling h6[data-sticky-active="true"] {
+  position: static;
+  transform: none !important;
+}
+
 .post-content h1 {
   top: var(--heading-sticky-top-1);
   z-index: 16;

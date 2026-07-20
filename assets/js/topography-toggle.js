@@ -64,6 +64,13 @@
       }
     }
 
+    function clearHeadingTransforms() {
+      var headings = root.querySelectorAll("h1, h2, h3, h4, h5, h6")
+      headings.forEach(function (heading) {
+        heading.style.transform = ""
+      })
+    }
+
     function setProgress(nextProgress) {
       progress = clamp(nextProgress, 0, 1)
       root.style.setProperty("--topography-progress", String(progress))
@@ -139,9 +146,9 @@
 
         settleRafId = 0
         if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
+        root.classList.remove("is-topography-settling")
         setProgress(target)
         setButtonState()
-        root.classList.remove("is-topography-settling")
         if (shouldVibrate) vibrateIfPossible()
       }
 
@@ -266,6 +273,7 @@
     function onPointerDown(event) {
       if (!shouldTrackGesture(event.pointerType, event.target)) return
       cancelSettleAnimation()
+      clearHeadingTransforms()
 
       dragging = {
         pointerId: event.pointerId,
@@ -317,6 +325,7 @@
 
         dragging.locked = true
         root.classList.add("is-topography-dragging")
+        clearHeadingTransforms()
       }
 
       event.preventDefault()
@@ -338,6 +347,7 @@
       var anchorState = dragging.anchorState
       dragging = null
       root.classList.remove("is-topography-dragging")
+      clearHeadingTransforms()
       if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
         headingNode.releasePointerCapture(event.pointerId)
       }
@@ -370,6 +380,7 @@
       var anchorState = dragging.anchorState
       dragging = null
       root.classList.remove("is-topography-dragging")
+      clearHeadingTransforms()
       if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
         headingNode.releasePointerCapture(event.pointerId)
       }
@@ -396,6 +407,7 @@
       }
       dragging = null
       root.classList.remove("is-topography-dragging")
+      clearHeadingTransforms()
       animateTo(resetTarget, 140, {
         commit: false,
         vibrate: false,

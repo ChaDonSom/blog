@@ -12,6 +12,8 @@
 
   topographyApi.bindTopographyToggle(root, {
     onProgress: function () {
+      if (root.classList.contains("is-topography-dragging")) return
+      if (root.classList.contains("is-topography-settling")) return
       window.dispatchEvent(new Event("scroll"))
     },
   })
