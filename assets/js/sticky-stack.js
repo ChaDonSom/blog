@@ -6,4 +6,13 @@
   if (!api || typeof api.bindStickyHeadings !== "function") return
 
   api.bindStickyHeadings(root)
+
+  var topographyApi = window.TopographyToggle
+  if (!topographyApi || typeof topographyApi.bindTopographyToggle !== "function") return
+
+  topographyApi.bindTopographyToggle(root, {
+    onProgress: function () {
+      window.dispatchEvent(new Event("scroll"))
+    },
+  })
 })()

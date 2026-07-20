@@ -31,6 +31,7 @@ body {
     Georgia,
     serif;
   color: #393630;
+  --topography-progress: 0;
   --heading-sticky-top-1: 0px;
   --heading-sticky-top-2: 0px;
   --heading-sticky-top-3: 0px;
@@ -47,9 +48,127 @@ body {
 .post-content h5,
 .post-content h6 {
   position: static;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   background: var(--heading-sticky-bg);
   box-shadow: 0 1px 0 #e6dfd4;
   padding: 2px 0 3px;
+}
+
+.topography-handle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc2b4;
+  border-radius: 999px;
+  background: #f4efe6;
+  color: #5a544c;
+  padding: 0;
+  margin-left: auto;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.topography-handle::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-top: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+}
+
+.topography-handle[aria-pressed="true"]::before {
+  inset: 4px 6px;
+  border-top-width: 1.8px;
+  border-bottom-width: 1.8px;
+}
+
+.topography-handle:hover {
+  border-color: #b8ae9f;
+  background: #f9f4eb;
+}
+
+.topography-handle:focus-visible {
+  outline: 2px solid #9f988e;
+  outline-offset: 2px;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.post-content h1:hover .topography-handle,
+.post-content h2:hover .topography-handle,
+.post-content h3:hover .topography-handle,
+.post-content h4:hover .topography-handle,
+.post-content h5:hover .topography-handle,
+.post-content h6:hover .topography-handle,
+.post-content h1:focus-within .topography-handle,
+.post-content h2:focus-within .topography-handle,
+.post-content h3:focus-within .topography-handle,
+.post-content h4:focus-within .topography-handle,
+.post-content h5:focus-within .topography-handle,
+.post-content h6:focus-within .topography-handle,
+.post-content[data-topography-mode="collapsed"] .topography-handle,
+.post-content.is-topography-dragging .topography-handle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.topography-segment {
+  --segment-height: auto;
+  overflow: clip;
+  max-height: calc(var(--segment-height) * (1 - var(--topography-progress)));
+  opacity: calc(1 - (var(--topography-progress) * 0.26));
+  filter: brightness(calc(1 - (var(--topography-progress) * 0.08)));
+  transform-origin: center top;
+}
+
+.topography-segment__inner {
+  transform-origin: center top;
+  transform: scale(calc(1 - (var(--topography-progress) * 0.05)), calc(1 - (var(--topography-progress) * 0.12)));
+}
+
+.post-content.is-topography-dragging {
+  user-select: none;
+}
+
+.post-content.is-topography-settling .topography-segment {
+  transition:
+    max-height 210ms ease-out,
+    opacity 210ms ease-out,
+    filter 210ms ease-out;
+}
+
+.post-content.is-topography-settling .topography-segment__inner {
+  transition: transform 210ms ease-out;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .topography-handle {
+    display: none;
+  }
+}
+
+@media (any-pointer: fine) and (any-pointer: coarse) {
+  .topography-handle {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topography-handle,
+  .topography-segment,
+  .topography-segment__inner {
+    transition: none !important;
+  }
 }
 
 .post-content h1[data-sticky-active="true"],
