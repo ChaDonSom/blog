@@ -152,14 +152,18 @@
     function applyAnchorCompensation(anchorState) {
       if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
 
-      var currentY = anchorState.node.getBoundingClientRect().top
-      var translateY = anchorState.lockY - currentY
+      var node = anchorState.node
+      // Measure natural heading Y without prior compensation to avoid feedback oscillation.
+      node.style.transform = ""
+      var naturalY = node.getBoundingClientRect().top
+      var translateY = anchorState.lockY - naturalY
+
       if (Math.abs(translateY) < 0.5) {
-        anchorState.node.style.transform = ""
+        node.style.transform = ""
         return
       }
 
-      anchorState.node.style.transform = "translateY(" + translateY + "px)"
+      node.style.transform = "translateY(" + translateY + "px)"
     }
 
     function cancelSettleAnimation() {
