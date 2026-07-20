@@ -50,11 +50,11 @@ body {
   position: static;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: calc(10px - (var(--topography-progress) * 3px));
   touch-action: pan-y;
   background: var(--heading-sticky-bg);
   box-shadow: 0 1px 0 #e6dfd4;
-  padding: 2px 0 3px;
+  padding: calc(2px - (var(--topography-progress) * 1px)) 0 calc(3px - (var(--topography-progress) * 1px));
 }
 
 .topography-handle {
@@ -184,7 +184,7 @@ body {
 .post-content h1 {
   top: var(--heading-sticky-top-1);
   z-index: 16;
-  margin: 0 0 23px;
+  margin: 0 0 calc(23px - (var(--topography-progress) * 10px));
   font:
     500 clamp(32px, 4vw, 46px) / 1.05 "Newsreader",
     Georgia,
@@ -195,7 +195,7 @@ body {
 .post-content h2 {
   top: var(--heading-sticky-top-2);
   z-index: 15;
-  margin: 39px 0 13px;
+  margin: calc(39px - (var(--topography-progress) * 18px)) 0 calc(13px - (var(--topography-progress) * 7px));
   font:
     600 21px / 1.2 "DM Sans",
     sans-serif;
@@ -205,7 +205,7 @@ body {
 .post-content h3 {
   top: var(--heading-sticky-top-3);
   z-index: 14;
-  margin: 28px 0 10px;
+  margin: calc(28px - (var(--topography-progress) * 13px)) 0 calc(10px - (var(--topography-progress) * 5px));
   font:
     600 18px / 1.25 "DM Sans",
     sans-serif;
@@ -214,7 +214,7 @@ body {
 .post-content h4 {
   top: var(--heading-sticky-top-4);
   z-index: 13;
-  margin: 24px 0 8px;
+  margin: calc(24px - (var(--topography-progress) * 10px)) 0 calc(8px - (var(--topography-progress) * 4px));
   font:
     600 16px / 1.25 "DM Sans",
     sans-serif;
@@ -223,7 +223,7 @@ body {
 .post-content h5 {
   top: var(--heading-sticky-top-5);
   z-index: 12;
-  margin: 20px 0 7px;
+  margin: calc(20px - (var(--topography-progress) * 8px)) 0 calc(7px - (var(--topography-progress) * 3px));
   font:
     600 14px / 1.25 "DM Sans",
     sans-serif;
@@ -232,7 +232,7 @@ body {
 .post-content h6 {
   top: var(--heading-sticky-top-6);
   z-index: 11;
-  margin: 18px 0 6px;
+  margin: calc(18px - (var(--topography-progress) * 7px)) 0 calc(6px - (var(--topography-progress) * 3px));
   font:
     600 13px / 1.25 "DM Sans",
     sans-serif;

@@ -31,6 +31,39 @@
       return Math.min(max, Math.max(min, value))
     }
 
+    function buildAnchorState(headingNode) {
+      if (!headingNode || !headingNode.isConnected) return null
+      return {
+        node: headingNode,
+        lockY: headingNode.getBoundingClientRect().top,
+        forceTop: false,
+      }
+    }
+
+    function keepAnchorVerticalPosition(anchorState, isExpanding) {
+      if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
+
+      var desiredY = anchorState.forceTop ? 0 : anchorState.lockY
+      var currentY = anchorState.node.getBoundingClientRect().top
+      var scrollDelta = currentY - desiredY
+      if (Math.abs(scrollDelta) < 0.5) return
+
+      var before = window.scrollY
+      window.scrollBy(0, scrollDelta)
+      var after = window.scrollY
+      var applied = after - before
+      var residual = scrollDelta - applied
+
+      // On expand, if bounds block perfect anchoring, prefer pinning chosen heading near viewport top.
+      if (isExpanding && !anchorState.forceTop && Math.abs(residual) > 1.5) {
+        anchorState.forceTop = true
+        desiredY = 0
+        currentY = anchorState.node.getBoundingClientRect().top
+        scrollDelta = currentY - desiredY
+        if (Math.abs(scrollDelta) >= 0.5) window.scrollBy(0, scrollDelta)
+      }
+    }
+
     function setProgress(nextProgress) {
       progress = clamp(nextProgress, 0, 1)
       root.style.setProperty("--topography-progress", String(progress))
@@ -69,12 +102,15 @@
       var opts = options || {}
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
+      var anchorState = opts.anchorState || null
 
       var from = progress
       var start = 0
       var delta = target - from
       if (Math.abs(delta) < 0.001) {
+        var prevAtStart = progress
         setProgress(target)
+        keepAnchorVerticalPosition(anchorState, target < prevAtStart)
         if (shouldCommit) committedMode = target >= 0.5 ? "collapsed" : "open"
         setButtonState()
         if (shouldVibrate) vibrateIfPossible()
@@ -92,7 +128,9 @@
         var elapsed = ts - start
         var t = clamp(elapsed / durationMs, 0, 1)
         var eased = easeOutCubic(t)
+        var prev = progress
         setProgress(from + delta * eased)
+        keepAnchorVerticalPosition(anchorState, progress < prev)
 
         if (t < 1) {
           settleRafId = window.requestAnimationFrame(tick)
@@ -110,11 +148,13 @@
       settleRafId = window.requestAnimationFrame(tick)
     }
 
-    function toggleMode() {
+    function toggleMode(headingNode) {
       var target = committedMode === "collapsed" ? 0 : 1
+      var anchorState = buildAnchorState(headingNode)
       animateTo(target, SETTLE_DURATION_MS, {
         commit: true,
         vibrate: true,
+        anchorState: anchorState,
       })
     }
 
@@ -201,13 +241,13 @@
 
         handle.addEventListener("click", function (event) {
           event.preventDefault()
-          toggleMode()
+          toggleMode(heading)
         })
 
         handle.addEventListener("keydown", function (event) {
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
-          toggleMode()
+          toggleMode(heading)
         })
 
         heading.appendChild(handle)
@@ -238,11 +278,14 @@
         lastT: event.timeStamp,
         velocityX: 0,
         headingNode: event.target.closest("h1, h2, h3, h4, h5, h6"),
+        anchorState: null,
       }
 
       if (dragging.headingNode && dragging.headingNode.setPointerCapture) {
         dragging.headingNode.setPointerCapture(event.pointerId)
       }
+
+      dragging.anchorState = buildAnchorState(dragging.headingNode)
     }
 
     function onPointerMove(event) {
@@ -261,6 +304,13 @@
       if (!dragging.locked) {
         if (Math.abs(dx) < LOCK_DISTANCE_PX) return
         if (Math.abs(dx) <= Math.abs(dy) * LOCK_RATIO) {
+          if (
+            dragging.headingNode &&
+            dragging.headingNode.releasePointerCapture &&
+            dragging.headingNode.hasPointerCapture(event.pointerId)
+          ) {
+            dragging.headingNode.releasePointerCapture(event.pointerId)
+          }
           dragging = null
           return
         }
@@ -270,8 +320,10 @@
       }
 
       event.preventDefault()
+      var prev = progress
       var next = dragging.startProgress + dx / DRAG_FULL_DISTANCE_PX
       setProgress(next)
+      keepAnchorVerticalPosition(dragging.anchorState, progress < prev)
       setButtonState()
     }
 
@@ -283,6 +335,7 @@
       var totalDx = event.clientX - dragging.startX
       var startMode = dragging.startMode
       var headingNode = dragging.headingNode
+      var anchorState = dragging.anchorState
       dragging = null
       root.classList.remove("is-topography-dragging")
       if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
@@ -298,6 +351,7 @@
         animateTo(commitTarget, SETTLE_DURATION_MS, {
           commit: true,
           vibrate: true,
+          anchorState: anchorState,
         })
         return
       }
@@ -305,6 +359,7 @@
       animateTo(startMode === "collapsed" ? 1 : 0, 150, {
         commit: false,
         vibrate: false,
+        anchorState: anchorState,
       })
     }
 
@@ -312,6 +367,7 @@
       if (!dragging || event.pointerId !== dragging.pointerId) return
       var startMode = dragging.startMode
       var headingNode = dragging.headingNode
+      var anchorState = dragging.anchorState
       dragging = null
       root.classList.remove("is-topography-dragging")
       if (headingNode && headingNode.releasePointerCapture && headingNode.hasPointerCapture(event.pointerId)) {
@@ -320,18 +376,30 @@
       animateTo(startMode === "collapsed" ? 1 : 0, 150, {
         commit: false,
         vibrate: false,
+        anchorState: anchorState,
       })
     }
 
     function onEscape(event) {
       if (event.key !== "Escape") return
       if (!dragging && !settleRafId) return
+      var headingNode = dragging ? dragging.headingNode : null
+      var anchorState = dragging ? dragging.anchorState : null
       var resetTarget = dragging ? (dragging.startMode === "collapsed" ? 1 : 0) : committedMode === "collapsed" ? 1 : 0
+      if (
+        dragging &&
+        headingNode &&
+        headingNode.releasePointerCapture &&
+        headingNode.hasPointerCapture(dragging.pointerId)
+      ) {
+        headingNode.releasePointerCapture(dragging.pointerId)
+      }
       dragging = null
       root.classList.remove("is-topography-dragging")
       animateTo(resetTarget, 140, {
         commit: false,
         vibrate: false,
+        anchorState: anchorState,
       })
     }
 
