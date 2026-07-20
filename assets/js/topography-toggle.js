@@ -149,14 +149,17 @@
       }
     }
 
-    function keepAnchorLocked(anchorState) {
+    function applyAnchorCompensation(anchorState) {
       if (!anchorState || !anchorState.node || !anchorState.node.isConnected) return
 
       var currentY = anchorState.node.getBoundingClientRect().top
-      var scrollDelta = currentY - anchorState.lockY
-      if (Math.abs(scrollDelta) < 0.5) return
+      var translateY = anchorState.lockY - currentY
+      if (Math.abs(translateY) < 0.5) {
+        anchorState.node.style.transform = ""
+        return
+      }
 
-      window.scrollBy(0, scrollDelta)
+      anchorState.node.style.transform = "translateY(" + translateY + "px)"
     }
 
     function cancelSettleAnimation() {
@@ -182,7 +185,7 @@
 
       if (Math.abs(delta) < 0.001) {
         setProgress(target)
-        keepAnchorLocked(anchorState)
+        applyAnchorCompensation(anchorState)
         if (shouldCommit) setCommittedModeFromTarget(target)
         syncHandleState()
         if (shouldVibrate) vibrateIfPossible()
@@ -203,7 +206,7 @@
         var eased = easeOutCubic(t)
 
         setProgress(from + delta * eased)
-        keepAnchorLocked(anchorState)
+        applyAnchorCompensation(anchorState)
 
         if (t < 1) {
           state.rafSettleId = window.requestAnimationFrame(tick)
@@ -213,7 +216,7 @@
         state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
-        keepAnchorLocked(anchorState)
+        applyAnchorCompensation(anchorState)
 
         if (shouldCommit) setCommittedModeFromTarget(target)
         syncHandleState()
@@ -419,7 +422,7 @@
 
       var nextProgress = dragState.startProgress + dx / CONFIG.DRAG_FULL_DISTANCE_PX
       setProgress(nextProgress)
-      keepAnchorLocked(dragState.anchorState)
+      applyAnchorCompensation(dragState.anchorState)
       syncHandleState()
     }
 

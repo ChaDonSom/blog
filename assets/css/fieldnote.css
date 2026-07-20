@@ -194,7 +194,6 @@ body {
 .post-content.is-topography-settling h5[data-sticky-active="true"],
 .post-content.is-topography-settling h6[data-sticky-active="true"] {
   position: static;
-  transform: none !important;
 }
 
 .post-content h1 {
