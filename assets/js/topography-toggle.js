@@ -224,18 +224,21 @@
       navigator.vibrate(8)
     }
 
-    function cancelSettleAnimation() {
+    function cancelSettleAnimation(options) {
+      var opts = options || {}
+      var preserveAnchorLock = !!opts.preserveAnchorLock
+
       if (state.rafSettleId) {
         window.cancelAnimationFrame(state.rafSettleId)
         state.rafSettleId = 0
       }
 
       root.classList.remove("is-topography-settling")
-      endAnchorLock()
+      if (!preserveAnchorLock) endAnchorLock()
     }
 
     function animateTo(target, durationMs, options) {
-      cancelSettleAnimation()
+      cancelSettleAnimation({ preserveAnchorLock: true })
 
       var opts = options || {}
       var shouldCommit = !!opts.commit
