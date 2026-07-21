@@ -260,6 +260,7 @@
 
       if (anchor) beginAnchorLock()
       root.classList.add("is-topography-settling")
+      keepAnchorLocked(anchor)
 
       function easeOutCubic(t) {
         return 1 - Math.pow(1 - t, 3)
