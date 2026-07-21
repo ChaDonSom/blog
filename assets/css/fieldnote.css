@@ -39,6 +39,16 @@ body {
   --heading-sticky-top-5: 0px;
   --heading-sticky-top-6: 0px;
   --heading-sticky-bg: var(--paper);
+  --topography-anchor-spacer: 0px;
+}
+
+.post-content.is-topography-anchor-lock {
+  overflow-anchor: none;
+}
+
+.post-content.has-topography-anchor-spacer {
+  padding-top: var(--topography-anchor-spacer);
+  padding-bottom: var(--topography-anchor-spacer);
 }
 
 .post-content h1,

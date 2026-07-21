@@ -27,6 +27,13 @@
       rafMeasureId: 0,
       rafSettleId: 0,
       resizeObserver: null,
+      anchorLock: {
+        active: false,
+        spacerPx: 0,
+        htmlOverflowAnchor: "",
+        bodyOverflowAnchor: "",
+        rootOverflowAnchor: "",
+      },
     }
 
     init()
@@ -41,6 +48,7 @@
         state.rafMeasureId = 0
       }
 
+      endAnchorLock()
       clearHeadingTransforms()
     }
 
@@ -110,6 +118,78 @@
       })
     }
 
+    function createAnchor(headingNode) {
+      if (!headingNode || !headingNode.isConnected) return null
+      return {
+        node: headingNode,
+        lockY: headingNode.getBoundingClientRect().top,
+      }
+    }
+
+    function beginAnchorLock() {
+      if (state.anchorLock.active) return
+
+      var spacerPx = Math.ceil(window.innerHeight || 0)
+      state.anchorLock.active = true
+      state.anchorLock.spacerPx = spacerPx
+      state.anchorLock.htmlOverflowAnchor = document.documentElement.style.getPropertyValue("overflow-anchor")
+      state.anchorLock.bodyOverflowAnchor = document.body.style.getPropertyValue("overflow-anchor")
+      state.anchorLock.rootOverflowAnchor = root.style.getPropertyValue("overflow-anchor")
+
+      document.documentElement.style.setProperty("overflow-anchor", "none")
+      document.body.style.setProperty("overflow-anchor", "none")
+      root.style.setProperty("overflow-anchor", "none")
+
+      root.style.setProperty("--topography-anchor-spacer", spacerPx + "px")
+      root.classList.add("has-topography-anchor-spacer", "is-topography-anchor-lock")
+
+      if (spacerPx > 0) window.scrollBy(0, spacerPx)
+    }
+
+    function endAnchorLock() {
+      if (!state.anchorLock.active) return
+
+      var spacerPx = state.anchorLock.spacerPx
+      if (spacerPx > 0) window.scrollBy(0, -spacerPx)
+
+      if (state.anchorLock.htmlOverflowAnchor) {
+        document.documentElement.style.setProperty("overflow-anchor", state.anchorLock.htmlOverflowAnchor)
+      } else {
+        document.documentElement.style.removeProperty("overflow-anchor")
+      }
+
+      if (state.anchorLock.bodyOverflowAnchor) {
+        document.body.style.setProperty("overflow-anchor", state.anchorLock.bodyOverflowAnchor)
+      } else {
+        document.body.style.removeProperty("overflow-anchor")
+      }
+
+      if (state.anchorLock.rootOverflowAnchor) {
+        root.style.setProperty("overflow-anchor", state.anchorLock.rootOverflowAnchor)
+      } else {
+        root.style.removeProperty("overflow-anchor")
+      }
+
+      root.classList.remove("has-topography-anchor-spacer", "is-topography-anchor-lock")
+      root.style.removeProperty("--topography-anchor-spacer")
+
+      state.anchorLock.active = false
+      state.anchorLock.spacerPx = 0
+      state.anchorLock.htmlOverflowAnchor = ""
+      state.anchorLock.bodyOverflowAnchor = ""
+      state.anchorLock.rootOverflowAnchor = ""
+    }
+
+    function keepAnchorLocked(anchor) {
+      if (!anchor || !anchor.node || !anchor.node.isConnected) return
+
+      var currentY = anchor.node.getBoundingClientRect().top
+      var delta = currentY - anchor.lockY
+      if (Math.abs(delta) < 0.5) return
+
+      window.scrollBy(0, delta)
+    }
+
     function setProgress(next) {
       state.progress = clamp(next, 0, 1)
       root.style.setProperty("--topography-progress", String(state.progress))
@@ -151,6 +231,7 @@
       }
 
       root.classList.remove("is-topography-settling")
+      endAnchorLock()
     }
 
     function animateTo(target, durationMs, options) {
@@ -159,18 +240,22 @@
       var opts = options || {}
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
+      var anchor = opts.anchor || null
       var from = state.progress
       var delta = target - from
       var startedAt = 0
 
       if (Math.abs(delta) < 0.001) {
         setProgress(target)
+        keepAnchorLocked(anchor)
         if (shouldCommit) setCommitted(target)
         syncHandleState()
+        endAnchorLock()
         if (shouldVibrate) vibrateIfPossible()
         return
       }
 
+      if (anchor) beginAnchorLock()
       root.classList.add("is-topography-settling")
 
       function easeOutCubic(t) {
@@ -185,6 +270,7 @@
         var eased = easeOutCubic(t)
 
         setProgress(from + delta * eased)
+        keepAnchorLocked(anchor)
 
         if (t < 1) {
           state.rafSettleId = window.requestAnimationFrame(tick)
@@ -194,9 +280,11 @@
         state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
+        keepAnchorLocked(anchor)
 
         if (shouldCommit) setCommitted(target)
         syncHandleState()
+        endAnchorLock()
         if (shouldVibrate) vibrateIfPossible()
       }
 
@@ -356,6 +444,7 @@
         velocityX: 0,
         locked: false,
         headingNode: headingNode,
+        anchor: createAnchor(headingNode),
       }
 
       if (headingNode && headingNode.setPointerCapture) {
@@ -387,12 +476,14 @@
 
         dragState.locked = true
         root.classList.add("is-topography-dragging")
+        beginAnchorLock()
       }
 
       event.preventDefault()
 
       var next = dragState.startProgress + dx / CONFIG.DRAG_FULL_DISTANCE_PX
       setProgress(next)
+      keepAnchorLocked(dragState.anchor)
       syncHandleState()
     }
 
@@ -401,7 +492,10 @@
       if (!dragState || event.pointerId !== dragState.pointerId) return
 
       clearDragState(event.pointerId)
-      if (!dragState.locked) return
+      if (!dragState.locked) {
+        endAnchorLock()
+        return
+      }
 
       var totalDx = event.clientX - dragState.startX
       var absDx = Math.abs(totalDx)
@@ -413,6 +507,7 @@
         animateTo(target, CONFIG.SETTLE_DURATION_MS, {
           commit: true,
           vibrate: true,
+          anchor: dragState.anchor,
         })
         return
       }
@@ -420,6 +515,7 @@
       animateTo(dragState.startCommitted, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
+        anchor: dragState.anchor,
       })
     }
 
@@ -432,6 +528,7 @@
       animateTo(dragState.startCommitted, CONFIG.CANCEL_DURATION_MS, {
         commit: false,
         vibrate: false,
+        anchor: dragState.anchor,
       })
     }
 
@@ -439,11 +536,13 @@
       if (event.key !== "Escape") return
       if (!state.dragging && !state.rafSettleId) return
 
-      if (state.dragging) clearDragState(state.dragging.pointerId)
+      var dragState = state.dragging
+      if (dragState) clearDragState(dragState.pointerId)
 
       animateTo(state.committed, CONFIG.ESCAPE_DURATION_MS, {
         commit: false,
         vibrate: false,
+        anchor: dragState && dragState.locked ? dragState.anchor : null,
       })
     }
   }
