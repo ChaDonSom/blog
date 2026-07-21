@@ -237,15 +237,19 @@
       if (!preserveAnchorLock) endAnchorLock()
     }
 
-    function animateTo(target, durationMs, options) {
+    function animateTo(
+      target, // 0-1
+      durationMs,
+      options,
+    ) {
       cancelSettleAnimation({ preserveAnchorLock: true })
 
       var opts = options || {}
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
       var anchor = opts.anchor || null
-      var from = state.progress
-      var delta = target - from
+      var from = clamp(state.progress * 1.1, 0, 1)
+      var delta = target - from // -1 to 1
       var startedAt = 0
 
       if (Math.abs(delta) < 0.001) {
