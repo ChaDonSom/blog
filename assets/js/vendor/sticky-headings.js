@@ -1,4 +1,4 @@
-(function (global) {
+;(function (global) {
   "use strict"
 
   function bindStickyHeadings(root, options) {
@@ -127,6 +127,13 @@
       })
     }
 
+    function clearStickyState(headings) {
+      headings.forEach(function (heading) {
+        heading.node.removeAttribute(stickyActiveAttr)
+        heading.node.style.transform = ""
+      })
+    }
+
     function resolveOwnPush(headings, activeByLevel, heading, stackHeight) {
       var stickyTop = levelStickyTopFromActive(activeByLevel, heading.level)
       var sectionEnd = nextSectionBoundaryIndex(headings, heading)
@@ -167,6 +174,11 @@
 
     function update() {
       var headings = collectHeadings()
+      if (root.classList.contains("is-topography-dragging") || root.classList.contains("is-topography-settling")) {
+        clearStickyState(headings)
+        return
+      }
+
       var activeByLevel = resolveActiveByLevel(headings)
       applyStickyTops(activeByLevel)
 
@@ -208,7 +220,8 @@
       window.removeEventListener("resize", schedule)
       window.removeEventListener("scroll", schedule)
       if (inputTarget && inputTarget.removeEventListener) inputTarget.removeEventListener("input", schedule)
-      if (document.fonts && document.fonts.removeEventListener) document.fonts.removeEventListener("loadingdone", schedule)
+      if (document.fonts && document.fonts.removeEventListener)
+        document.fonts.removeEventListener("loadingdone", schedule)
     }
   }
 
