@@ -248,7 +248,9 @@
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
       var anchor = opts.anchor || null
-      var from = clamp(state.progress * 1.1, 0, 1)
+      var from = clamp(state.progress * 1.5, 0, 1) // Where is progress converted to positions and stuff?
+      console.log("state.progress :", state.progress)
+      console.log("from :", from)
       var delta = target - from // -1 to 1
       var startedAt = 0
 
