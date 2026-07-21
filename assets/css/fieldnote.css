@@ -31,6 +31,7 @@ body {
     Georgia,
     serif;
   color: #393630;
+  --topography-progress: 0;
   --heading-sticky-top-1: 0px;
   --heading-sticky-top-2: 0px;
   --heading-sticky-top-3: 0px;
@@ -38,6 +39,16 @@ body {
   --heading-sticky-top-5: 0px;
   --heading-sticky-top-6: 0px;
   --heading-sticky-bg: var(--paper);
+  --topography-anchor-spacer: 0px;
+}
+
+.post-content.is-topography-anchor-lock {
+  overflow-anchor: none;
+}
+
+.post-content.has-topography-anchor-spacer {
+  padding-top: var(--topography-anchor-spacer);
+  padding-bottom: var(--topography-anchor-spacer);
 }
 
 .post-content h1,
@@ -47,9 +58,128 @@ body {
 .post-content h5,
 .post-content h6 {
   position: static;
+  display: flex;
+  align-items: center;
+  gap: calc(10px - (var(--topography-progress) * 3px));
+  touch-action: pan-y;
   background: var(--heading-sticky-bg);
   box-shadow: 0 1px 0 #e6dfd4;
-  padding: 2px 0 3px;
+  padding: calc(2px - (var(--topography-progress) * 1px)) 0 calc(3px - (var(--topography-progress) * 1px));
+}
+
+.topography-handle {
+  position: relative;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 1px solid #ccc2b4;
+  border-radius: 999px;
+  background: #f4efe6;
+  color: #5a544c;
+  padding: 0;
+  margin-left: auto;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.95);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    border-color 140ms ease,
+    background-color 140ms ease;
+}
+
+.topography-handle::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-top: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+}
+
+.topography-handle[aria-pressed="true"]::before {
+  inset: 4px 6px;
+  border-top-width: 1.8px;
+  border-bottom-width: 1.8px;
+}
+
+.topography-handle:hover {
+  border-color: #b8ae9f;
+  background: #f9f4eb;
+}
+
+.topography-handle:focus-visible {
+  outline: 2px solid #9f988e;
+  outline-offset: 2px;
+  opacity: 1;
+  transform: scale(1);
+}
+
+.post-content h1:hover .topography-handle,
+.post-content h2:hover .topography-handle,
+.post-content h3:hover .topography-handle,
+.post-content h4:hover .topography-handle,
+.post-content h5:hover .topography-handle,
+.post-content h6:hover .topography-handle,
+.post-content h1:focus-within .topography-handle,
+.post-content h2:focus-within .topography-handle,
+.post-content h3:focus-within .topography-handle,
+.post-content h4:focus-within .topography-handle,
+.post-content h5:focus-within .topography-handle,
+.post-content h6:focus-within .topography-handle,
+.post-content[data-topography-mode="collapsed"] .topography-handle,
+.post-content.is-topography-dragging .topography-handle {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.topography-segment {
+  --segment-height: auto;
+  overflow: clip;
+  max-height: calc(var(--segment-height) * (1 - var(--topography-progress)));
+  opacity: calc(1 - (var(--topography-progress) * 0.26));
+  filter: brightness(calc(1 - (var(--topography-progress) * 0.08)));
+  transform-origin: center top;
+}
+
+.topography-segment__inner {
+  transform-origin: center top;
+  transform: scale(calc(1 - (var(--topography-progress) * 0.05)), calc(1 - (var(--topography-progress) * 0.12)));
+}
+
+.post-content.is-topography-dragging {
+  user-select: none;
+}
+
+.post-content.is-topography-settling .topography-segment {
+  transition:
+    max-height 210ms ease-out,
+    opacity 210ms ease-out,
+    filter 210ms ease-out;
+}
+
+.post-content.is-topography-settling .topography-segment__inner {
+  transition: transform 210ms ease-out;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .topography-handle {
+    display: none;
+  }
+}
+
+@media (any-pointer: fine) and (any-pointer: coarse) {
+  .topography-handle {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topography-handle,
+  .topography-segment,
+  .topography-segment__inner {
+    transition: none !important;
+  }
 }
 
 .post-content h1[data-sticky-active="true"],
@@ -61,10 +191,25 @@ body {
   position: sticky;
 }
 
+.post-content.is-topography-dragging h1[data-sticky-active="true"],
+.post-content.is-topography-dragging h2[data-sticky-active="true"],
+.post-content.is-topography-dragging h3[data-sticky-active="true"],
+.post-content.is-topography-dragging h4[data-sticky-active="true"],
+.post-content.is-topography-dragging h5[data-sticky-active="true"],
+.post-content.is-topography-dragging h6[data-sticky-active="true"],
+.post-content.is-topography-settling h1[data-sticky-active="true"],
+.post-content.is-topography-settling h2[data-sticky-active="true"],
+.post-content.is-topography-settling h3[data-sticky-active="true"],
+.post-content.is-topography-settling h4[data-sticky-active="true"],
+.post-content.is-topography-settling h5[data-sticky-active="true"],
+.post-content.is-topography-settling h6[data-sticky-active="true"] {
+  position: static;
+}
+
 .post-content h1 {
   top: var(--heading-sticky-top-1);
   z-index: 16;
-  margin: 0 0 23px;
+  margin: 0 0 calc(23px - (var(--topography-progress) * 10px));
   font:
     500 clamp(32px, 4vw, 46px) / 1.05 "Newsreader",
     Georgia,
@@ -75,7 +220,7 @@ body {
 .post-content h2 {
   top: var(--heading-sticky-top-2);
   z-index: 15;
-  margin: 39px 0 13px;
+  margin: calc(39px - (var(--topography-progress) * 18px)) 0 calc(13px - (var(--topography-progress) * 7px));
   font:
     600 21px / 1.2 "DM Sans",
     sans-serif;
@@ -85,7 +230,7 @@ body {
 .post-content h3 {
   top: var(--heading-sticky-top-3);
   z-index: 14;
-  margin: 28px 0 10px;
+  margin: calc(28px - (var(--topography-progress) * 13px)) 0 calc(10px - (var(--topography-progress) * 5px));
   font:
     600 18px / 1.25 "DM Sans",
     sans-serif;
@@ -94,7 +239,7 @@ body {
 .post-content h4 {
   top: var(--heading-sticky-top-4);
   z-index: 13;
-  margin: 24px 0 8px;
+  margin: calc(24px - (var(--topography-progress) * 10px)) 0 calc(8px - (var(--topography-progress) * 4px));
   font:
     600 16px / 1.25 "DM Sans",
     sans-serif;
@@ -103,7 +248,7 @@ body {
 .post-content h5 {
   top: var(--heading-sticky-top-5);
   z-index: 12;
-  margin: 20px 0 7px;
+  margin: calc(20px - (var(--topography-progress) * 8px)) 0 calc(7px - (var(--topography-progress) * 3px));
   font:
     600 14px / 1.25 "DM Sans",
     sans-serif;
@@ -112,7 +257,7 @@ body {
 .post-content h6 {
   top: var(--heading-sticky-top-6);
   z-index: 11;
-  margin: 18px 0 6px;
+  margin: calc(18px - (var(--topography-progress) * 7px)) 0 calc(6px - (var(--topography-progress) * 3px));
   font:
     600 13px / 1.25 "DM Sans",
     sans-serif;

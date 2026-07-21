@@ -8,6 +8,6 @@
     "postinstall": "npm run sync:sticky-headings"
   },
   "dependencies": {
-    "@chadonsom/sticky-headings": "^0.1.0"
+    "@chadonsom/sticky-headings": "^0.1.1"
   }
 }
