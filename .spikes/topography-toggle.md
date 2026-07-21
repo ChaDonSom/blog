@@ -16,6 +16,8 @@ This UX affordance is definitely worth it. 
 
 I also want to make it swipe from left to right for both maybe.
 
+Also buttons should also help the header in place.
+
 And a complete rewrite might not be so bad.
 
 ## Not so bad to figure out the code
