@@ -29,3 +29,11 @@ It wasn't so bad to start figuring it out, like I thought it would be. Then I fi
 `2026-07-21 09:42 AM`​
 
 The text caret moves with drags, here in Fieldnote. That feature might interact with this.
+
+## Super fast try some things
+
+Try to install it locally to test it
+
+![image](image-12.png)Got Bundler installed but it fails, running from `~/blog`​ so I think it should work? Just no more time tonight to ask Grok or whoever for more.
+
+![image](image-13.png)
