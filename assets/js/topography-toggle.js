@@ -185,7 +185,7 @@
 
       var currentY = anchor.node.getBoundingClientRect().top
       var delta = currentY - anchor.lockY
-      if (Math.abs(delta) < 0.5) return
+      // if (Math.abs(delta) < 0.5) return
 
       window.scrollBy(0, delta)
     }
