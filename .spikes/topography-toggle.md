@@ -43,3 +43,7 @@ Try to install it locally to test it
 Got it to run! `2026-07-22 10:18 PM`​
 
 ![image](image-14.png)I wonder if I can get some console logs in to start seeing what the interaction/animation is doing...
+
+I found if I remove the `keepAnchorLocked`​ functionality, it at least doesn't flash all over the place anymore.
+
+This file should be much easier to read and debug and understand going forward. Use `bundle exec jekyll serve`​ to run.
