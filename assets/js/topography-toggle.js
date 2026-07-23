@@ -180,16 +180,6 @@
       state.anchorLock.rootOverflowAnchor = ""
     }
 
-    function keepAnchorLocked(anchor) {
-      if (!anchor || !anchor.node || !anchor.node.isConnected) return
-
-      var currentY = anchor.node.getBoundingClientRect().top
-      var delta = currentY - anchor.lockY
-      // if (Math.abs(delta) < 0.5) return
-
-      window.scrollBy(0, delta)
-    }
-
     function setProgress(next) {
       state.progress = clamp(next, 0, 1)
       root.style.setProperty("--topography-progress", String(state.progress))
@@ -248,7 +238,7 @@
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
       var anchor = opts.anchor || null
-      var from = clamp(state.progress * (target === 0 ? 1.5 : 0.75), 0, 1) // Where is progress converted to positions and stuff?
+      var from = clamp(state.progress, 0, 1) // Where is progress converted to positions and stuff?
       console.log("state.progress :", state.progress)
       console.log("from :", from)
       var delta = target - from // -1 to 1
@@ -256,7 +246,6 @@
 
       if (Math.abs(delta) < 0.001) {
         setProgress(target)
-        keepAnchorLocked(anchor)
         if (shouldCommit) setCommitted(target)
         syncHandleState()
         endAnchorLock()
@@ -266,7 +255,6 @@
 
       if (anchor) beginAnchorLock()
       root.classList.add("is-topography-settling")
-      keepAnchorLocked(anchor)
 
       function easeOutCubic(t) {
         return 1 - Math.pow(1 - t, 3)
@@ -280,7 +268,6 @@
         var eased = easeOutCubic(t)
 
         setProgress(from + delta * eased)
-        keepAnchorLocked(anchor)
 
         if (t < 1) {
           state.rafSettleId = window.requestAnimationFrame(tick)
@@ -290,7 +277,6 @@
         state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
-        keepAnchorLocked(anchor)
 
         if (shouldCommit) setCommitted(target)
         syncHandleState()

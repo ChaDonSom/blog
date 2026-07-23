@@ -37,3 +37,9 @@ Try to install it locally to test it
 ![image](image-12.png)Got Bundler installed but it fails, running from `~/blog`​ so I think it should work? Just no more time tonight to ask Grok or whoever for more.
 
 ![image](image-13.png)
+
+## Got it
+
+Got it to run! `2026-07-22 10:18 PM`​
+
+![image](image-14.png)I wonder if I can get some console logs in to start seeing what the interaction/animation is doing...
