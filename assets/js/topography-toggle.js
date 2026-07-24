@@ -29,10 +29,14 @@
       resizeObserver: null,
       anchorLock: {
         active: false,
-        spacerPx: 0,
+        anchor: null,
+        rafId: 0,
+        pendingAnchor: null,
         htmlOverflowAnchor: "",
         bodyOverflowAnchor: "",
         rootOverflowAnchor: "",
+        htmlScrollBehavior: "",
+        bodyScrollBehavior: "",
       },
     }
 
@@ -126,31 +130,66 @@
       }
     }
 
-    function beginAnchorLock() {
-      if (state.anchorLock.active) return
+    function nudgeScrollToAnchor(anchor) {
+      if (!anchor || !anchor.node || !anchor.node.isConnected) return
 
-      var spacerPx = Math.ceil(window.innerHeight || 0)
+      var currentY = anchor.node.getBoundingClientRect().top
+      var deltaY = currentY - anchor.lockY
+
+      if (Math.abs(deltaY) < 0.5) return
+      window.scrollBy(0, deltaY)
+    }
+
+    function flushAnchorLockFrame() {
+      state.anchorLock.rafId = 0
+      var pendingAnchor = state.anchorLock.pendingAnchor
+      state.anchorLock.pendingAnchor = null
+      nudgeScrollToAnchor(pendingAnchor || state.anchorLock.anchor)
+    }
+
+    function keepAnchorLocked(anchor) {
+      if (!state.anchorLock.active) return
+
+      state.anchorLock.pendingAnchor = anchor || state.anchorLock.anchor || null
+      if (!state.anchorLock.pendingAnchor) return
+
+      if (!state.anchorLock.rafId) {
+        state.anchorLock.rafId = window.requestAnimationFrame(flushAnchorLockFrame)
+      }
+    }
+
+    function beginAnchorLock(anchor) {
+      if (state.anchorLock.active) {
+        state.anchorLock.anchor = anchor || state.anchorLock.anchor
+        return
+      }
+
       state.anchorLock.active = true
-      state.anchorLock.spacerPx = spacerPx
+      state.anchorLock.anchor = anchor || null
       state.anchorLock.htmlOverflowAnchor = document.documentElement.style.getPropertyValue("overflow-anchor")
       state.anchorLock.bodyOverflowAnchor = document.body.style.getPropertyValue("overflow-anchor")
       state.anchorLock.rootOverflowAnchor = root.style.getPropertyValue("overflow-anchor")
+      state.anchorLock.htmlScrollBehavior = document.documentElement.style.getPropertyValue("scroll-behavior")
+      state.anchorLock.bodyScrollBehavior = document.body.style.getPropertyValue("scroll-behavior")
 
       document.documentElement.style.setProperty("overflow-anchor", "none")
       document.body.style.setProperty("overflow-anchor", "none")
       root.style.setProperty("overflow-anchor", "none")
+      document.documentElement.style.setProperty("scroll-behavior", "auto")
+      document.body.style.setProperty("scroll-behavior", "auto")
 
-      root.style.setProperty("--topography-anchor-spacer", spacerPx + "px")
-      root.classList.add("has-topography-anchor-spacer", "is-topography-anchor-lock")
-
-      if (spacerPx > 0) window.scrollBy(0, spacerPx)
+      root.classList.add("is-topography-anchor-lock")
+      nudgeScrollToAnchor(state.anchorLock.anchor)
     }
 
     function endAnchorLock() {
       if (!state.anchorLock.active) return
 
-      var spacerPx = state.anchorLock.spacerPx
-      if (spacerPx > 0) window.scrollBy(0, -spacerPx)
+      if (state.anchorLock.rafId) {
+        window.cancelAnimationFrame(state.anchorLock.rafId)
+        state.anchorLock.rafId = 0
+      }
+      state.anchorLock.pendingAnchor = null
 
       if (state.anchorLock.htmlOverflowAnchor) {
         document.documentElement.style.setProperty("overflow-anchor", state.anchorLock.htmlOverflowAnchor)
@@ -170,14 +209,27 @@
         root.style.removeProperty("overflow-anchor")
       }
 
-      root.classList.remove("has-topography-anchor-spacer", "is-topography-anchor-lock")
-      root.style.removeProperty("--topography-anchor-spacer")
+      if (state.anchorLock.htmlScrollBehavior) {
+        document.documentElement.style.setProperty("scroll-behavior", state.anchorLock.htmlScrollBehavior)
+      } else {
+        document.documentElement.style.removeProperty("scroll-behavior")
+      }
+
+      if (state.anchorLock.bodyScrollBehavior) {
+        document.body.style.setProperty("scroll-behavior", state.anchorLock.bodyScrollBehavior)
+      } else {
+        document.body.style.removeProperty("scroll-behavior")
+      }
+
+      root.classList.remove("is-topography-anchor-lock")
 
       state.anchorLock.active = false
-      state.anchorLock.spacerPx = 0
+      state.anchorLock.anchor = null
       state.anchorLock.htmlOverflowAnchor = ""
       state.anchorLock.bodyOverflowAnchor = ""
       state.anchorLock.rootOverflowAnchor = ""
+      state.anchorLock.htmlScrollBehavior = ""
+      state.anchorLock.bodyScrollBehavior = ""
     }
 
     function setProgress(next) {
@@ -238,9 +290,13 @@
       var shouldCommit = !!opts.commit
       var shouldVibrate = !!opts.vibrate
       var anchor = opts.anchor || null
-      var from = clamp(state.progress, 0, 1) // Where is progress converted to positions and stuff?
-      console.log("state.progress :", state.progress)
-      console.log("from :", from)
+
+      if (anchor) {
+        beginAnchorLock(anchor)
+        keepAnchorLocked(anchor)
+      }
+
+      var from = clamp(state.progress, 0, 1)
       var delta = target - from // -1 to 1
       var startedAt = 0
 
@@ -253,7 +309,6 @@
         return
       }
 
-      if (anchor) beginAnchorLock()
       root.classList.add("is-topography-settling")
 
       function easeOutCubic(t) {
@@ -268,6 +323,7 @@
         var eased = easeOutCubic(t)
 
         setProgress(from + delta * eased)
+        if (anchor) keepAnchorLocked(anchor)
 
         if (t < 1) {
           state.rafSettleId = window.requestAnimationFrame(tick)
@@ -277,6 +333,7 @@
         state.rafSettleId = 0
         root.classList.remove("is-topography-settling")
         setProgress(target)
+        if (anchor) nudgeScrollToAnchor(anchor)
 
         if (shouldCommit) setCommitted(target)
         syncHandleState()
@@ -472,7 +529,7 @@
 
         dragState.locked = true
         root.classList.add("is-topography-dragging")
-        beginAnchorLock()
+        beginAnchorLock(dragState.anchor)
       }
 
       event.preventDefault()
