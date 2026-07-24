@@ -30,6 +30,7 @@
       anchorLock: {
         active: false,
         anchor: null,
+        spacerPx: 0,
         rafId: 0,
         pendingAnchor: null,
         htmlOverflowAnchor: "",
@@ -130,14 +131,61 @@
       }
     }
 
+    function getSegmentForHeading(headingNode) {
+      if (!headingNode) return null
+
+      // Segments are inserted before the next heading in wrapBodySegments,
+      // so the segment affecting this heading sits immediately before it.
+      var sibling = headingNode.previousElementSibling
+      while (sibling && !sibling.hasAttribute("data-topography-segment")) {
+        sibling = sibling.previousElementSibling
+      }
+
+      return sibling || null
+    }
+
+    function computeSpacerPx(anchor) {
+      var headingNode = anchor && anchor.node ? anchor.node : null
+      var segment = getSegmentForHeading(headingNode)
+
+      if (!segment) return Math.ceil(window.innerHeight * 0.25)
+
+      var measured = parseFloat(segment.style.getPropertyValue("--segment-height")) || 0
+      if (!measured) measured = Math.ceil(segment.scrollHeight)
+
+      return Math.max(measured, window.innerHeight * 0.25)
+    }
+
+    function applyAnchorSpacer(nextSpacerPx) {
+      var current = state.anchorLock.spacerPx || 0
+      var target = Math.max(0, Math.ceil(nextSpacerPx || 0))
+      if (target <= current) return
+
+      var delta = target - current
+      state.anchorLock.spacerPx = target
+      root.style.setProperty("--topography-anchor-spacer", target + "px")
+      root.classList.add("has-topography-anchor-spacer")
+
+      // Adding top padding shifts content down. Counter-scroll immediately.
+      window.scrollTo(0, window.scrollY + delta)
+    }
+
     function nudgeScrollToAnchor(anchor) {
       if (!anchor || !anchor.node || !anchor.node.isConnected) return
 
       var currentY = anchor.node.getBoundingClientRect().top
       var deltaY = currentY - anchor.lockY
 
-      if (Math.abs(deltaY) < 0.5) return
-      window.scrollBy(0, deltaY)
+      if (Math.abs(deltaY) < 0.25) return
+
+      // Use an absolute target so tiny per-frame errors do not accumulate.
+      var targetScrollY = clamp(
+        window.scrollY + deltaY,
+        0,
+        Math.max(0, document.documentElement.scrollHeight - window.innerHeight),
+      )
+
+      window.scrollTo(0, targetScrollY)
     }
 
     function flushAnchorLockFrame() {
@@ -153,6 +201,9 @@
       state.anchorLock.pendingAnchor = anchor || state.anchorLock.anchor || null
       if (!state.anchorLock.pendingAnchor) return
 
+      // Correct immediately in the same frame as the progress update.
+      nudgeScrollToAnchor(state.anchorLock.pendingAnchor)
+
       if (!state.anchorLock.rafId) {
         state.anchorLock.rafId = window.requestAnimationFrame(flushAnchorLockFrame)
       }
@@ -161,6 +212,8 @@
     function beginAnchorLock(anchor) {
       if (state.anchorLock.active) {
         state.anchorLock.anchor = anchor || state.anchorLock.anchor
+        applyAnchorSpacer(computeSpacerPx(state.anchorLock.anchor))
+        keepAnchorLocked(state.anchorLock.anchor)
         return
       }
 
@@ -177,6 +230,8 @@
       root.style.setProperty("overflow-anchor", "none")
       document.documentElement.style.setProperty("scroll-behavior", "auto")
       document.body.style.setProperty("scroll-behavior", "auto")
+
+      applyAnchorSpacer(computeSpacerPx(state.anchorLock.anchor))
 
       root.classList.add("is-topography-anchor-lock")
       nudgeScrollToAnchor(state.anchorLock.anchor)
@@ -221,10 +276,18 @@
         document.body.style.removeProperty("scroll-behavior")
       }
 
+      var spacerPx = state.anchorLock.spacerPx || 0
+      root.classList.remove("has-topography-anchor-spacer")
+      root.style.setProperty("--topography-anchor-spacer", "0px")
+      if (spacerPx) {
+        window.scrollTo(0, Math.max(0, window.scrollY - spacerPx))
+      }
+
       root.classList.remove("is-topography-anchor-lock")
 
       state.anchorLock.active = false
       state.anchorLock.anchor = null
+      state.anchorLock.spacerPx = 0
       state.anchorLock.htmlOverflowAnchor = ""
       state.anchorLock.bodyOverflowAnchor = ""
       state.anchorLock.rootOverflowAnchor = ""
@@ -304,6 +367,7 @@
         setProgress(target)
         if (shouldCommit) setCommitted(target)
         syncHandleState()
+        if (anchor) nudgeScrollToAnchor(anchor)
         endAnchorLock()
         if (shouldVibrate) vibrateIfPossible()
         return
@@ -344,11 +408,14 @@
       state.rafSettleId = window.requestAnimationFrame(tick)
     }
 
-    function toggleFromHandle() {
+    function toggleFromHandle(headingNode) {
       var target = state.committed === 1 ? 0 : 1
+      var anchor = createAnchor(headingNode)
+
       animateTo(target, CONFIG.SETTLE_DURATION_MS, {
         commit: true,
         vibrate: true,
+        anchor: anchor,
       })
     }
 
@@ -437,13 +504,13 @@
 
         handle.addEventListener("click", function (event) {
           event.preventDefault()
-          toggleFromHandle()
+          toggleFromHandle(heading)
         })
 
         handle.addEventListener("keydown", function (event) {
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
-          toggleFromHandle()
+          toggleFromHandle(heading)
         })
 
         heading.appendChild(handle)
