@@ -6,9 +6,4 @@
   if (!api || typeof api.bindTopographyToggle !== "function") return
 
   api.bindTopographyToggle(root)
-
-  var topographyApi = window.TopographyToggle
-  if (!topographyApi || typeof topographyApi.bindTopographyToggle !== "function") return
-
-  topographyApi.bindTopographyToggle(root)
 })()

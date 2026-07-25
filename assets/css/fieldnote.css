@@ -194,6 +194,7 @@ body {
   position: static;
 }
 
+/* #region MARK: Headings */
 .post-content h1 {
   top: var(--heading-sticky-top-1);
   z-index: 16;
@@ -256,6 +257,7 @@ body {
     sans-serif;
   color: var(--muted);
 }
+/* #endregion */
 
 .post-content p,
 .post-content ul,

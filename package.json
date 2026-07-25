@@ -10,6 +10,6 @@
   },
   "dependencies": {
     "@chadonsom/sticky-headings": "^0.1.1",
-    "@chadonsom/topography-toggle": "^0.3.0"
+    "@chadonsom/topography-toggle": "^0.3.1"
   }
 }
