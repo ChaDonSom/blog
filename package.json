@@ -5,9 +5,11 @@
   "type": "module",
   "scripts": {
     "sync:sticky-headings": "node scripts/sync-sticky-headings.mjs",
-    "postinstall": "npm run sync:sticky-headings"
+    "sync:topography-toggle": "node scripts/sync-topography-toggle.mjs",
+    "postinstall": "npm run sync:sticky-headings && npm run sync:topography-toggle"
   },
   "dependencies": {
-    "@chadonsom/sticky-headings": "^0.1.1"
+    "@chadonsom/sticky-headings": "^0.1.1",
+    "@chadonsom/topography-toggle": "^0.3.0"
   }
 }
