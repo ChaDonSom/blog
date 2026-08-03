@@ -158,6 +158,11 @@
       return Math.max(measured, window.innerHeight * 0.25)
     }
 
+    /**
+     * This is how we apply the spacer. I was trying to figure out a way to visualize it in-process, but I dunno how to
+     * make padding/margin show up on the page. I had tried manually writing in the classes I saw while dragging, on the
+     * .page-content element, but I don't think I had them all correct.
+     */
     function applyAnchorSpacer(nextSpacerPx) {
       var current = state.anchorLock.spacerPx || 0
       var target = Math.max(0, Math.ceil(nextSpacerPx || 0))
