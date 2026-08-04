@@ -8,6 +8,6 @@ But it's not just plain foresight. You have to have foresight to see what can wo
 
 This came out of trying to figure out `MomentCast`​ for Pinia ORM. When I started using Pinia ORM, it was because the querying saves a lot of mental trouble of manual JS sorting and filtering on the reactive data. But now, it has cost me almost 3 days of work because I can't figure out their mental model for how data should move into and out of the store.
 
-This has been 3 days of hard work, but not much to show for it. So, even though it's been hard work, it hasn't done much. "Perfect practice makes perfect".
+This has been 3 days of hard work, but not much to show for it. So, even though it's been hard work, it hasn't done much. "_Perfect_ practice makes perfect".
 
 Your results are due more to foresight than hard work.
